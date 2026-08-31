@@ -50,7 +50,7 @@ git init
 git add -A
 git commit -m "ระบบติดตามโครงการมหาวิหารเก้าฟ้า"
 git branch -M main
-git remote add origin git@github.com:anavin/nm74-project-control.git
+git remote add origin git@github.com:anavin/nwm74.git
 git push -u origin main
 ```
 
