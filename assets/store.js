@@ -22,7 +22,7 @@ const MAPS = {
     brand:"brand", reviewer:"reviewer", leadDays:"lead_days", requiredOn:"required_on", dueDate:"due_date",
     submitDate:"submit_date", status:"status", decisionDate:"decision_date", note:"note"},
   files: {name:"name", size:"size", mime:"mime", refType:"ref_type", refId:"ref_id",
-    docType:"doc_type", storagePath:"storage_path", createdAt:"created_at"}
+    docType:"doc_type", storagePath:"storage_path", url:"url", createdAt:"created_at"}
 };
 const DATE_FIELDS = new Set(["end_date","req_date","paid_date","submit_date","old_end","new_end",
   "decision_date","required_on","due_date"]);
@@ -136,7 +136,15 @@ const Store = (() => {
     });
     if(error){ await sb.storage.from(BUCKET).remove([path]); throw error; }
   }
+  async function addLink({url, name, refType, refId, docType}){
+    const {error} = await sb.from("files").insert({
+      name: name || url, size: null, mime: "link", url,
+      ref_type: refType, ref_id: refId, doc_type: docType || "other", storage_path: null
+    });
+    if(error) throw error;
+  }
   async function fileUrl(f){
+    if(f.url) return f.url;
     const {data, error} = await sb.storage.from(BUCKET).createSignedUrl(f.storagePath, 60 * 10);
     if(error) throw error;
     return data.signedUrl;
@@ -147,6 +155,6 @@ const Store = (() => {
     if(error) throw error;
   }
 
-  return {init, onAuth, signIn, signOut, loadAll, save, remove, subscribe, uploadFile, fileUrl, deleteFile,
+  return {init, onAuth, signIn, signOut, loadAll, save, remove, subscribe, uploadFile, addLink, fileUrl, deleteFile,
           get client(){ return sb; }};
 })();

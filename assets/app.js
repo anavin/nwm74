@@ -184,9 +184,29 @@ async function uploadFiles(list, refType, refId, docType){
   }
   await refresh();
 }
+function addLinkDialog(refType, refId, docType, after){
+  const dts=DOC_TYPES[refType]||DOC_TYPES.payment;
+  openModal("แนบลิงก์เอกสาร",
+    fld("url","ลิงก์ (URL)","","url")+
+    fld("name","ชื่อที่จะให้แสดง","")+
+    sel("dt","ประเภทเอกสาร",docType||dts[0][0],dts.map(d=>[d[0],d[1]]))+
+    '<div class="muted" style="font-size:12.5px;line-height:1.6">ใช้กับเอกสารที่เก็บไว้ที่อื่น เช่น Google Drive, '+
+    'OneDrive, ลิงก์แชร์จากผู้รับเหมา — ระบบจะเก็บแค่ลิงก์ ไม่ได้คัดลอกไฟล์มาเก็บ '+
+    'ผู้ที่กดเปิดต้องมีสิทธิ์เข้าถึงลิงก์นั้นเอง</div>',
+    async o=>{
+      const url=(o.url||"").trim();
+      if(!/^https?:\/\//i.test(url)) throw new Error("ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://");
+      let nm=(o.name||"").trim();
+      if(!nm){ try{ const u=new URL(url); nm=decodeURIComponent((u.pathname.split("/").filter(Boolean).pop())||u.hostname); }catch(e){ nm=url; } }
+      await Store.addLink({url, name:nm, refType, refId, docType:o.dt});
+      await refresh();
+      if(after) after();
+    });
+}
 async function downloadFile(f){
   try{
     const url = await Store.fileUrl(f);
+    if(f.url){ window.open(url,"_blank","noopener"); return; }
     const a=document.createElement("a"); a.href=url; a.download=f.name; a.rel="noopener";
     document.body.appendChild(a); a.click(); a.remove();
   }catch(e){ toast("เปิดไฟล์ไม่สำเร็จ: "+(e.message||e)); }
@@ -726,7 +746,7 @@ function viewDocs(){
    '<th class="r">ขนาด</th><th>วันที่แนบ</th><th></th></tr></thead><tbody>'+
    (S.files.length?S.files.map(f=>'<tr><td data-l="ชื่อไฟล์">'+esc(f.name)+'</td><td data-l="ผูกกับรายการ" class="muted">'+esc(refLabel(f))+'</td>'+
      '<td data-l="ประเภท"><span class="pill info">'+esc(docMeta(f.refType,f.docType||"other")[1])+'</span></td>'+
-     '<td data-l="ขนาด" class="r num">'+bytes(f.size)+'</td>'+
+     '<td data-l="ขนาด" class="r num">'+(f.url?'<span class="pill info">ลิงก์</span>':bytes(f.size))+'</td>'+
      '<td data-l="วันที่แนบ" class="num">'+thDate((f.createdAt||"").slice(0,10))+'</td>'+
      '<td><div class="rowacts"><button class="btn ghost sm" data-dl="'+f.id+'">ดาวน์โหลด</button>'+
      '<button class="btn ghost sm" data-rmfile="'+f.id+'">ลบ</button></div></td></tr>').join("")
@@ -875,9 +895,11 @@ function openFiles(refType,refId){
               refType==="payment"? (esc(rec.invoice||"")+" · งวดที่ "+(rec.seq||"—")) :
               refType==="rfa"? esc(rec.title||"") : refType==="eot"? ("ครั้งที่ "+(rec.no||"")+" · "+esc(rec.docNo||"")) :
               esc(rec.building||"");
-  const fileRow = f=>'<div class="filerow"><div class="ic">'+esc((f.name.split(".").pop()||"?").slice(0,4).toUpperCase())+'</div>'+
+  const fileRow = f=>'<div class="filerow"><div class="ic'+(f.url?" link":"")+'">'+
+      (f.url?"LINK":esc((f.name.split(".").pop()||"?").slice(0,4).toUpperCase()))+'</div>'+
       '<div style="flex:1;min-width:0"><div class="nm">'+esc(f.name)+'</div>'+
-      '<div class="mt">'+bytes(f.size)+' · '+thDate((f.createdAt||"").slice(0,10))+'</div></div>'+
+      '<div class="mt">'+(f.url?esc(String(f.url).replace(/^https?:\/\//,"").slice(0,42)):bytes(f.size))+
+      ' · '+thDate((f.createdAt||"").slice(0,10))+'</div></div>'+
       '<button class="btn ghost sm" data-dl="'+f.id+'">เปิด</button>'+
       '<button class="btn ghost sm" data-rmfile="'+f.id+'">ลบ</button></div>'+
       (/^image\//.test(f.mime||"")?'<img class="thumb" data-img="'+f.id+'" alt="'+esc(f.name)+'">':"");
@@ -891,7 +913,8 @@ function openFiles(refType,refId){
       return '<section class="docslot'+(fs.length?" filled":(need?" needed":""))+'">'+
         '<header><span class="ab">'+ab+'</span><div><div class="lb">'+esc(label)+'</div>'+
         '<div class="st">'+(fs.length? fs.length+" ไฟล์" : (need?"ยังไม่มี — จำเป็นต้องมี":"ยังไม่มี"))+'</div></div>'+
-        '<button class="btn sm" data-add="'+t+'">แนบ</button></header>'+
+        '<button class="btn sm" data-add="'+t+'">แนบไฟล์</button>'+
+        '<button class="btn sm" data-link="'+t+'">ลิงก์</button></header>'+
         (fs.length? fs.map(fileRow).join("") : "")+'</section>';
     }).join("");
     st.files.filter(f=>/^image\//.test(f.mime||"")).forEach(async f=>{
@@ -919,6 +942,8 @@ function openFiles(refType,refId){
   ["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("hot");}));
   drop.addEventListener("drop",async e=>{ await uploadFiles([...e.dataTransfer.files],refType,refId,null); render(); });
   $("#flist").addEventListener("click",e=>{
+    const lk=e.target.closest("[data-link]");
+    if(lk){ addLinkDialog(refType,refId,lk.dataset.link,()=>openFiles(refType,refId)); return; }
     const b=e.target.closest("[data-add]"); if(!b) return;
     pendingType=b.dataset.add; fin.click();
   });

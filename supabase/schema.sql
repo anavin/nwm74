@@ -100,10 +100,13 @@ create table if not exists nm74.files (          -- ทะเบียนเอ�
   ref_type     text not null,                   -- payment | extra | rfa | eot
   ref_id       text not null,
   doc_type     text default 'other',            -- invoice | report | slip | form | spec | drawing | letter | result | other
-  storage_path text not null,
+  storage_path text,                             -- ว่างได้ ถ้าเป็นลิงก์
+  url          text,                             -- ลิงก์ภายนอก (Drive ฯลฯ)
   created_at   timestamptz default now(),
   created_by   uuid default auth.uid()
 );
+alter table nm74.files drop constraint if exists files_has_source;
+alter table nm74.files add constraint files_has_source check (storage_path is not null or url is not null);
 create index if not exists files_ref_idx on nm74.files(ref_type, ref_id);
 create index if not exists files_type_idx on nm74.files(ref_type, ref_id, doc_type);
 

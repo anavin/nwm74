@@ -221,6 +221,7 @@ td.c,th.c{text-align:center}
   color:var(--ink-3);font-size:14px;cursor:pointer;background:var(--surface-2);line-height:1.7}
 .drop.hot{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-soft)}
 .filerow{display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.filerow .ic.link{background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent-ink);font-size:9px}
 .filerow .ic{width:34px;height:34px;border-radius:3px;background:var(--surface-2);color:var(--ink-3);
   border:1px solid var(--line);display:grid;place-items:center;font-size:11px;font-weight:600;
   font-family:"IBM Plex Mono",monospace;letter-spacing:.04em;flex:none}
@@ -287,6 +288,7 @@ td.c,th.c{text-align:center}
 .docslot .lb{font-weight:600;font-size:14.5px}
 .docslot .st{font-size:12.5px;color:var(--ink-3)}
 .docslot header .btn{margin-left:auto}
+.docslot header .btn+.btn{margin-left:6px}
 .docslot .filerow:last-child{border-bottom:0;padding-bottom:0}
 
 .ctr-docs{display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);flex-wrap:wrap}
