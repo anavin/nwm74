@@ -124,12 +124,58 @@ async function remove(col,id){
   catch(e){ toast("ลบไม่สำเร็จ: "+(e.message||e)); }
 }
 
+/* ============================ ประเภทเอกสารแนบ ============================ */
+const DOC_TYPES = {
+  payment:[["invoice","ใบเบิก","บ"],["report","รายงานงวดงาน","ร"],["slip","สลิปโอนเงิน","ส"],["other","อื่นๆ","อ"]],
+  extra:  [["invoice","ใบเบิก","บ"],["report","รายงาน / รูปงาน","ร"],["slip","สลิปโอนเงิน","ส"],["other","อื่นๆ","อ"]],
+  rfa:    [["form","แบบฟอร์ม RFA","ฟ"],["spec","แคตตาล็อก / สเปก","ค"],["drawing","Shop Drawing","ด"],["result","ผลอนุมัติ","ผ"],["other","อื่นๆ","อ"]],
+  eot:    [["letter","หนังสือขอขยายเวลา","น"],["form","แบบฟอร์ม RFA","ฟ"],["support","เอกสารประกอบ","ป"],["result","ผลอนุมัติ","ผ"],["other","อื่นๆ","อ"]]
+};
+const docMeta=(rt,t)=>(DOC_TYPES[rt]||DOC_TYPES.payment).find(x=>x[0]===t)||["other","อื่นๆ","อ"];
+const GUESS=[[/สลิป|slip|โอน|transfer|pay[-_ ]?in/i,"slip"],[/ใบเบิก|เบิก|invoice|บิล|แจ้งหนี้|pph|nt20/i,"invoice"],
+  [/รายงาน|report|ตรวจ|inspect|progress/i,"report"],[/shop|drawing|แบบขยาย|dwg/i,"drawing"],
+  [/catalog|แคตตาล็อก|spec|สเปค|brochure/i,"spec"],[/rfa|ฟอร์ม/i,"form"],[/หนังสือ|letter/i,"letter"],
+  [/อนุมัติ|approve|result/i,"result"]];
+function guessType(name,refType){
+  const allowed=(DOC_TYPES[refType]||[]).map(x=>x[0]);
+  for(const [re,t] of GUESS) if(re.test(name) && allowed.includes(t)) return t;
+  return "other";
+}
+/* เอกสารที่ "ต้องมี" ของแต่ละรายการ ขึ้นกับสถานะของรายการนั้น */
+function requiredDocs(rt,rec){
+  if(rt==="payment"||rt==="extra") return rec.paidDate?["invoice","report","slip"]:["invoice","report"];
+  if(rt==="rfa"){ if(!rec.submitDate) return [];
+    return ["อนุมัติแล้ว","อนุมัติตามหมายเหตุ","ไม่อนุมัติ","ให้แก้ไข/ยื่นใหม่"].includes(rec.status)?["form","result"]:["form"]; }
+  if(rt==="eot") return rec.decisionDate?["letter","result"]:["letter"];
+  return [];
+}
+function docState(rt,rec){
+  const fs=filesFor(rt,rec.id), have=new Set(fs.map(f=>f.docType||"other"));
+  const need=requiredDocs(rt,rec);
+  return {files:fs, have, need, missing:need.filter(t=>!have.has(t))};
+}
+/* ตัวบ่งชี้เอกสารในตาราง — ตัวอักษรย่อ ทึบ = มีแล้ว, เส้นประ = ยังขาด */
+function docChip(rt,rec){
+  const st=docState(rt,rec);
+  const shown=st.need.length?st.need:(DOC_TYPES[rt]||[]).slice(0,3).map(x=>x[0]);
+  const extra=st.files.filter(f=>!shown.includes(f.docType||"other")).length;
+  return '<button class="docchip" data-files="'+rt+':'+rec.id+'" title="จัดการเอกสารแนบ">'+
+    shown.map(t=>{const m=docMeta(rt,t);
+      return '<i class="'+(st.have.has(t)?"on":"miss")+'" title="'+esc(m[1])+'">'+m[2]+'</i>';}).join("")+
+    (extra?'<span class="xtra">+'+extra+'</span>':'')+'</button>';
+}
+function missingLabel(rt,rec){
+  const st=docState(rt,rec);
+  return st.missing.map(t=>docMeta(rt,t)[1]).join(" · ");
+}
+
 /* ============================ files ============================ */
 const MAX_FILE = 25*1024*1024;
-async function uploadFiles(list, refType, refId){
+async function uploadFiles(list, refType, refId, docType){
   for(const f of list){
     if(f.size>MAX_FILE){ toast("ไฟล์ "+f.name+" ใหญ่เกิน 25 MB"); continue; }
-    try{ await Store.uploadFile(f,refType,refId); toast("แนบ "+f.name+" แล้ว"); }
+    const t = docType || guessType(f.name, refType);
+    try{ await Store.uploadFile(f,refType,refId,t); toast("แนบ "+f.name+" เป็น "+docMeta(refType,t)[1]); }
     catch(e){ toast("อัปโหลดไม่สำเร็จ: "+(e.message||e)); }
   }
   await refresh();
@@ -183,84 +229,147 @@ function viewDash(){
   const left=daysBetween(new Date().toISOString().slice(0,10), end);
   const approved=S.eots.filter(e=>e.status==="อนุมัติแล้ว").reduce((s,e)=>s+Number(e.days||0),0);
   const waiting=S.eots.filter(e=>e.status==="รออนุมัติ").reduce((s,e)=>s+Number(e.days||0),0);
-  const overdue=S.payments.filter(p=>pstatus(p)==="late");
-  const dues=S.payments.filter(p=>!isPaid(p)).sort((a,b)=>(a.reqDate||"").localeCompare(b.reqDate||""));
   const rfaLate=S.rfas.filter(r=>rfaState(r)==="late"), rfaDue=S.rfas.filter(r=>rfaState(r)==="due");
+
+  /* ---- ค้างจ่าย: รวมงวดงาน + งานเพิ่ม เรียงตามอายุหนี้ ---- */
+  const dueRows=[];
+  S.payments.filter(p=>!isPaid(p)).forEach(p=>{
+    const c=S.contracts.find(c=>c.id===p.contractId);
+    dueRows.push({rt:"payment",rec:p,who:c?c.code:"—",what:"งวดที่ "+p.seq,
+      invoice:p.invoice,amount:paidNet(p),date:p.reqDate,age:daysBetween(p.reqDate)});
+  });
+  S.extras.filter(x=>!isPaid(x)).forEach(x=>dueRows.push({rt:"extra",rec:x,who:x.building,what:"งานเพิ่ม",
+      invoice:x.invoice,amount:paidNet(x),date:x.reqDate,age:daysBetween(x.reqDate)}));
+  dueRows.sort((a,b)=>(b.age||0)-(a.age||0));
+  const dueTotal=dueRows.reduce((s,r)=>s+r.amount,0);
+  const overdue=dueRows.filter(r=>(r.age||0)>30);
+  const overdueSum=overdue.reduce((s,r)=>s+r.amount,0);
+  const maxAge=Math.max(45,...dueRows.map(r=>r.age||0));
+
+  /* ---- เอกสารไม่ครบ ---- */
+  const gaps=[];
+  S.payments.forEach(p=>{const m=docState("payment",p).missing; if(m.length){const c=S.contracts.find(c=>c.id===p.contractId);
+    gaps.push({rt:"payment",id:p.id,title:(c?c.code+" · ":"")+"งวดที่ "+p.seq+" ("+(p.invoice||"—")+")",miss:missingLabel("payment",p)});}});
+  S.extras.forEach(x=>{const m=docState("extra",x).missing; if(m.length)
+    gaps.push({rt:"extra",id:x.id,title:"งานเพิ่ม · "+x.building,miss:missingLabel("extra",x)});});
+  S.eots.forEach(e=>{const m=docState("eot",e).missing; if(m.length)
+    gaps.push({rt:"eot",id:e.id,title:"ขยายเวลาครั้งที่ "+e.no+" ("+e.docNo+")",miss:missingLabel("eot",e)});});
+  S.rfas.forEach(r=>{const m=docState("rfa",r).missing; if(m.length)
+    gaps.push({rt:"rfa",id:r.id,title:"ขออนุมัติ · "+(r.title||""),miss:missingLabel("rfa",r)});});
 
   const kpi=(cls,lab,val,unit,note)=>'<div class="kpi '+cls+'"><div class="lab">'+lab+'</div><div class="val">'+val+
     (unit?'<small>'+unit+'</small>':'')+'</div><div class="note">'+(note||"")+'</div></div>';
 
   $("#view").innerHTML =
+  /* ============ แผงค้างจ่าย ============ */
+  '<section class="hero">'+
+    '<div class="hero-main">'+
+      '<div class="hero-lab">ยอดค้างจ่าย ณ วันนี้</div>'+
+      '<div class="hero-fig">'+money(dueTotal)+'<small>บาท</small></div>'+
+      '<div class="hero-sub">'+dueRows.length+' รายการที่เบิกแล้วยังไม่ได้โอน'+
+        (overdue.length?' · <b class="warn">เกิน 30 วัน '+overdue.length+' รายการ ('+money(overdueSum)+' บาท)</b>':' · ยังไม่มีรายการเกินกำหนด')+
+      '</div>'+
+    '</div>'+
+    '<div class="hero-split">'+
+      S.contracts.map(c=>{const st=contractStats(c); if(!st.due) return "";
+        return '<div class="hs-row"><span class="hs-nm">'+esc(c.code)+'</span>'+
+          '<span class="hs-bar"><i style="width:'+Math.round(st.due/Math.max(1,dueTotal)*100)+'%"></i></span>'+
+          '<span class="hs-val num">'+money(st.due)+'</span></div>';}).join("")+
+      (S.extras.filter(x=>!isPaid(x)).length?
+        '<div class="hs-row"><span class="hs-nm">งานเพิ่ม</span><span class="hs-bar"><i style="width:'+
+        Math.round(S.extras.filter(x=>!isPaid(x)).reduce((s,x)=>s+paidNet(x),0)/Math.max(1,dueTotal)*100)+
+        '%"></i></span><span class="hs-val num">'+money(S.extras.filter(x=>!isPaid(x)).reduce((s,x)=>s+paidNet(x),0))+'</span></div>':'')+
+      '<div class="hs-foot">รอบจ่ายเฉลี่ยที่ผ่านมา '+(lag==null?"—":lag+" วัน")+' หลังยื่นใบเบิก</div>'+
+    '</div>'+
+  '</section>'+
+
+  /* ============ ตารางค้างจ่ายรายรายการ ============ */
+  '<div class="card" style="margin-bottom:16px"><div class="card-h"><h3>รายการค้างจ่าย</h3>'+
+  '<span class="hint">เรียงตามอายุหนี้ · แถบสีแดงคือเกิน 30 วัน</span></div><div class="tablewrap">'+
+  (dueRows.length?'<table><thead><tr><th>รายการ</th><th>เลขที่ใบเบิก</th><th>ยื่นเมื่อ</th>'+
+    '<th>อายุหนี้</th><th class="r">ยอดที่ต้องโอน</th><th class="c">เอกสาร</th><th></th></tr></thead><tbody>'+
+    dueRows.map(r=>{
+      const late=(r.age||0)>30;
+      return '<tr><td data-l="รายการ" class="stripe '+(late?"late":"due")+'" style="min-width:200px">'+
+        '<div style="font-weight:600">'+esc(r.who)+' · '+esc(r.what)+'</div>'+
+        '<div class="muted" style="font-size:11.5px">'+esc((r.rec.detail||"").slice(0,70))+'</div></td>'+
+        '<td data-l="เลขที่ใบเบิก" class="num">'+esc(r.invoice||"—")+'</td>'+
+        '<td data-l="ยื่นเมื่อ" class="num">'+thDate(r.date)+'</td>'+
+        '<td data-l="อายุหนี้" style="min-width:130px"><div class="agewrap"><span class="agebar'+(late?" late":"")+'">'+
+          '<i style="width:'+Math.min(100,Math.round((r.age||0)/maxAge*100))+'%"></i></span>'+
+          '<b class="num'+(late?" agelate":"")+'">'+(r.age==null?"—":r.age+" วัน")+'</b></div></td>'+
+        '<td data-l="ยอดที่ต้องโอน" class="r num" style="font-weight:600;font-size:14px">'+money(r.amount)+'</td>'+
+        '<td data-l="เอกสาร" class="c"><div>'+docChip(r.rt,r.rec)+'</div></td>'+
+        '<td><div class="rowacts"><button class="btn ghost sm" data-edit="'+(r.rt==="payment"?"pay":"extra")+':'+r.rec.id+'">บันทึกการโอน</button></div></td></tr>';
+    }).join("")+
+    '</tbody><tfoot><tr><td colspan="4" class="r" style="font-weight:600">รวมค้างจ่าย</td>'+
+    '<td class="r num" style="font-weight:700;font-size:15px">'+money(dueTotal)+'</td><td colspan="2"></td></tr></tfoot></table>'
+   :'<div class="empty">ไม่มีรายการค้างจ่าย — จ่ายครบทุกงวดแล้ว</div>')+
+  '</div></div>'+
+
+  /* ============ ตัวเลขรอง ============ */
   '<div class="grid kpis" style="margin-bottom:16px">'+
-    kpi("hero","มูลค่าสัญญารวม",money(t.contract),"บาท",S.contracts.length+" สัญญา · งานเพิ่ม "+money(t.extra)+" บาท")+
-    kpi("","เบิกแล้วสะสม",money(t.billed+t.extra),"บาท","คิดเป็น "+((t.billed+t.extra)/Math.max(1,t.contract)*100).toFixed(1)+"% ของมูลค่าสัญญา")+
-    kpi("","จ่ายแล้ว",money(t.paid+t.extraPaid),"บาท","รอบจ่ายเฉลี่ย "+(lag==null?"—":lag+" วัน")+" หลังยื่นใบเบิก")+
-    kpi(t.due>0?"warn":"","ค้างจ่าย",money(t.due),"บาท",dues.length+" งวดที่ยังไม่โอน"+(overdue.length?" · เกิน 30 วัน "+overdue.length+" งวด":""))+
+    kpi("lead","มูลค่าสัญญารวม",money(t.contract),"บาท",S.contracts.length+" สัญญา · งานเพิ่ม "+money(t.extra)+" บาท")+
+    kpi("","เบิกแล้วสะสม",money(t.billed+t.extra),"บาท",((t.billed+t.extra)/Math.max(1,t.contract)*100).toFixed(1)+"% ของมูลค่าสัญญา")+
+    kpi("","จ่ายแล้ว",money(t.paid+t.extraPaid),"บาท","คงเหลือตามสัญญา "+money(t.contract-t.billed)+" บาท")+
     kpi(left<90?"bad":"","กำหนดแล้วเสร็จ",thDate(end),"",
       (left>=0?"เหลืออีก "+left+" วัน":"เลยกำหนด "+Math.abs(left)+" วัน")+" · ขยายแล้ว "+approved+" วัน"+
-      (waiting?" (รออนุมัติอีก "+waiting+" วัน → "+thDate(pend)+")":""))+
+      (waiting?" (รออนุมัติอีก "+waiting+" วัน)":""))+
     kpi(rfaLate.length?"bad":(rfaDue.length?"warn":""),"งานขออนุมัติ",S.rfas.length,"รายการ",
-      "รอผล "+rfaDue.length+" · ต้องเร่ง "+rfaLate.length+" · ยังไม่ยื่น "+S.rfas.filter(r=>rfaState(r)==="idle").length+
-      " · อนุมัติแล้ว "+S.rfas.filter(r=>rfaState(r)==="paid").length)+
+      "รอผล "+rfaDue.length+" · ต้องเร่ง "+rfaLate.length+" · อนุมัติแล้ว "+S.rfas.filter(r=>rfaState(r)==="paid").length)+
+    kpi(gaps.length?"warn":"","เอกสารไม่ครบ",gaps.length,"รายการ",gaps.length?"ดูรายละเอียดด้านล่าง":"เอกสารครบทุกรายการ")+
   '</div>'+
 
-  '<div class="grid" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);align-items:start">'+
+  /* ============ สองคอลัมน์ ============ */
+  '<div class="grid" style="grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);align-items:start">'+
     '<div class="card"><div class="card-h"><h3>ความคืบหน้าการเบิกจ่ายรายสัญญา</h3>'+
       '<span class="hint">สัดส่วนของมูลค่าสัญญา</span></div><div class="card-b">'+
       S.contracts.map(c=>{
-        const s=contractStats(c), amt=Number(c.amount||1);
-        const wp=Math.min(100,s.paid/amt*100), wd=Math.min(100,s.due/amt*100);
+        const st=contractStats(c), amt=Number(c.amount||1);
+        const wp=Math.min(100,st.paid/amt*100), wd=Math.min(100,st.due/amt*100);
         return '<div class="ctr-row"><div class="ctr-head"><div><div class="nm">'+esc(c.code)+' — '+esc(c.name)+'</div>'+
           '<div class="who">'+esc(c.contractor)+'</div></div>'+
           '<div class="num" style="font-weight:600">'+money(c.amount)+' <span class="muted" style="font-weight:400">บาท</span></div></div>'+
           '<div class="meter"><span class="s-paid" style="width:'+wp+'%"></span>'+
           '<span class="s-due" style="width:'+wd+'%"></span>'+
           '<span class="s-un" style="width:'+Math.max(0,100-wp-wd)+'%"></span></div>'+
-          '<div class="ctr-figs"><span>จ่ายแล้ว <b>'+money(s.paid)+'</b></span>'+
-          '<span>ค้างจ่าย <b>'+money(s.due)+'</b></span>'+
-          '<span>ยังไม่เบิก <b>'+money(s.rest)+'</b></span>'+
-          '<span class="muted">'+s.count+'/'+(c.periods||"—")+' งวด</span></div></div>';
+          '<div class="ctr-figs"><span>จ่ายแล้ว <b>'+money(st.paid)+'</b></span>'+
+          '<span>ค้างจ่าย <b'+(st.due?' style="color:var(--due)"':'')+'>'+money(st.due)+'</b></span>'+
+          '<span>ยังไม่เบิก <b>'+money(st.rest)+'</b></span>'+
+          '<span class="muted">'+st.count+'/'+(c.periods||"—")+' งวด</span></div></div>';
       }).join("")+
-      '<div class="legend"><span><i style="background:var(--paid)"></i>จ่ายแล้ว</span>'+
-      '<span><i style="background:var(--due)"></i>เบิกแล้วรอโอน</span>'+
+      '<div class="legend"><span><i style="background:var(--fill-paid)"></i>จ่ายแล้ว</span>'+
+      '<span><i style="background:var(--fill-due)"></i>เบิกแล้วรอโอน</span>'+
       '<span><i style="background:var(--unbilled)"></i>ยังไม่เบิก</span></div>'+
     '</div></div>'+
 
-    '<div class="card"><div class="card-h"><h3>ต้องติดตาม</h3><span class="hint">เรียงตามความเร่งด่วน</span></div>'+
-    '<div class="card-b" style="display:grid;gap:12px">'+
-      (S.eots.filter(e=>e.status==="รออนุมัติ").map(e=>
-        '<div style="display:flex;gap:10px;align-items:flex-start"><span class="pill due">รออนุมัติ</span>'+
-        '<div><div style="font-weight:600;font-size:13px">ขอขยายเวลาครั้งที่ '+e.no+' · '+esc(e.docNo)+'</div>'+
-        '<div class="muted" style="font-size:12px">ยื่น '+thDate(e.submitDate)+' · ขอ '+e.days+' วัน · ค้าง '+
-        (daysBetween(e.submitDate)||0)+' วันแล้ว</div></div></div>').join("")||"")+
-      (rfaLate.concat(rfaDue).slice(0,4).map(r=>{
-        const st=rfaState(r), dl=rfaDeadline(r);
-        return '<div style="display:flex;gap:10px;align-items:flex-start"><span class="pill '+st+'">'+
-          (st==="late"?"ต้องเร่ง":"รออนุมัติ")+'</span>'+
-          '<div><div style="font-weight:600;font-size:13px">'+esc(r.title||"")+(r.docNo?' · '+esc(r.docNo):'')+'</div>'+
-          '<div class="muted" style="font-size:12px">'+esc(r.trade||"")+
-          (dl?' · ต้องอนุมัติภายใน '+thDate(dl):'')+(r.submitDate?' · ยื่น '+thDate(r.submitDate):' · ยังไม่ยื่น')+'</div></div></div>';
-      }).join(""))+
-      (dues.length? dues.slice(0,5).map(p=>{
-        const st=pstatus(p), age=daysBetween(p.reqDate);
-        const c=S.contracts.find(c=>c.id===p.contractId);
-        return '<div style="display:flex;gap:10px;align-items:flex-start"><span class="pill '+st+'">'+(st==="late"?age+" วัน":"ค้าง")+'</span>'+
-          '<div><div style="font-weight:600;font-size:13px">'+esc(p.invoice||"—")+' · '+money(paidNet(p))+' บาท</div>'+
-          '<div class="muted" style="font-size:12px">'+esc(c?c.code:"")+' งวดที่ '+p.seq+' · ยื่น '+thDate(p.reqDate)+'</div></div></div>';
-      }).join("") : '<div class="muted">ไม่มีงวดค้างจ่าย</div>')+
-    '</div></div>'+
-    '<div class="card" style="margin-top:14px"><div class="card-h"><h3>เอกสารล่าสุด</h3>'+
-    '<span class="hint">'+S.files.length+' ไฟล์</span></div><div class="card-b" style="padding-top:4px">'+
-    (S.files.length? S.files.slice(0,5).map(f=>
-      '<div class="filerow"><div class="ic">'+esc((f.name.split(".").pop()||"?").slice(0,4).toUpperCase())+'</div>'+
-      '<div style="flex:1;min-width:0"><div class="nm">'+esc(f.name)+'</div>'+
-      '<div class="mt">'+bytes(f.size)+' · '+thDate((f.createdAt||"").slice(0,10))+'</div></div>'+
-      '<button class="btn ghost sm" data-dl="'+f.id+'">บันทึก</button></div>').join("")
-     : '<div class="empty" style="padding:26px 10px">ยังไม่มีเอกสารแนบ — กดปุ่มแนบในแต่ละรายการเพื่อเก็บเอกสารไว้ที่นี่</div>')+
-    '</div></div>'+
+    '<div style="display:grid;gap:14px">'+
+      '<div class="card"><div class="card-h"><h3>ต้องติดตาม</h3><span class="hint">งานอนุมัติและเวลา</span></div>'+
+      '<div class="card-b" style="display:grid;gap:12px">'+
+        ((S.eots.filter(e=>e.status==="รออนุมัติ").map(e=>
+          '<div class="tk"><span class="pill due">รออนุมัติ</span>'+
+          '<div><div class="tk-t">ขอขยายเวลาครั้งที่ '+e.no+' · '+esc(e.docNo)+'</div>'+
+          '<div class="tk-s">ยื่น '+thDate(e.submitDate)+' · ขอ '+e.days+' วัน · ค้าง '+(daysBetween(e.submitDate)||0)+' วันแล้ว</div></div></div>').join("")+
+         rfaLate.concat(rfaDue).slice(0,4).map(r=>{
+          const st=rfaState(r), dl=rfaDeadline(r);
+          return '<div class="tk"><span class="pill '+st+'">'+(st==="late"?"ต้องเร่ง":"รออนุมัติ")+'</span>'+
+            '<div><div class="tk-t">'+esc(r.title||"")+(r.docNo?' · '+esc(r.docNo):'')+'</div>'+
+            '<div class="tk-s">'+esc(r.trade||"")+(dl?' · ต้องอนุมัติภายใน '+thDate(dl):'')+'</div></div></div>';
+         }).join("")) || '<div class="muted">ไม่มีงานค้างอนุมัติ</div>')+
+      '</div></div>'+
+
+      '<div class="card"><div class="card-h"><h3>เอกสารไม่ครบ</h3>'+
+      '<span class="hint">'+gaps.length+' รายการ</span></div><div class="card-b" style="display:grid;gap:10px">'+
+      (gaps.length? gaps.slice(0,7).map(g=>
+        '<div class="tk"><button class="clip" data-files="'+g.rt+':'+g.id+'">แนบ</button>'+
+        '<div><div class="tk-t">'+esc(g.title)+'</div><div class="tk-s">ขาด: '+esc(g.miss)+'</div></div></div>').join("")+
+        (gaps.length>7?'<div class="muted" style="font-size:12px">และอีก '+(gaps.length-7)+' รายการ</div>':'')
+       : '<div class="muted">เอกสารครบทุกรายการ</div>')+
+      '</div></div>'+
+    '</div>'+
   '</div>'+
 
-  '<div class="card" style="margin-top:14px"><div class="card-h"><h3>ไทม์ไลน์สัญญาและการขยายเวลา</h3>'+
+  '<div class="card" style="margin-top:16px"><div class="card-h"><h3>ไทม์ไลน์สัญญาและการขยายเวลา</h3>'+
   '<span class="hint">อาคาร 3 ชั้น — บริษัท เอ พลัส แอสโซซิเอท จำกัด</span></div><div class="card-b">'+timelineHTML()+'</div></div>';
 }
 function timelineHTML(){
@@ -319,7 +428,7 @@ function viewPay(){
           '<td data-l="เลขที่ใบเบิก" class="num">'+esc(p.invoice||"—")+'</td><td data-l="วันที่เบิก" class="num">'+thDate(p.reqDate)+'</td>'+
           '<td data-l="วันที่โอน" class="num">'+(p.paidDate?thDate(p.paidDate):'<span class="muted">—</span>')+'</td>'+
           '<td data-l="สถานะ" class="c"><span class="pill '+st+'">'+statusLabel(st)+(st!=="paid"&&age!=null?" "+age+" วัน":"")+'</span></td>'+
-          '<td data-l="เอกสาร" class="c"><div><button class="clip'+(n?"":" add")+'" data-files="payment:'+p.id+'">'+(n?"📎 "+n:"+ แนบ")+'</button></div></td>'+
+          '<td data-l="เอกสาร" class="c"><div>'+docChip("payment",p)+'</div></td>'+
           '<td><div class="rowacts"><button class="btn ghost sm" data-edit="pay:'+p.id+'">แก้ไข</button>'+
           '<button class="btn ghost sm" data-del="pay:'+p.id+'">ลบ</button></div></td></tr>';
       }).join("")+
@@ -352,7 +461,7 @@ function viewExtra(){
         '<td data-l="เลขที่ใบเบิก" class="num">'+esc(x.invoice||"—")+'</td><td data-l="วันที่เบิก" class="num">'+thDate(x.reqDate)+'</td>'+
         '<td data-l="วันที่โอน" class="num">'+(x.paidDate?thDate(x.paidDate):'<span class="muted">—</span>')+'</td>'+
         '<td data-l="สถานะ" class="c"><span class="pill '+st+'">'+statusLabel(st)+'</span></td>'+
-        '<td data-l="เอกสาร" class="c"><div><button class="clip'+(n?"":" add")+'" data-files="extra:'+x.id+'">'+(n?"📎 "+n:"+ แนบ")+'</button></div></td>'+
+        '<td data-l="เอกสาร" class="c"><div>'+docChip("extra",x)+'</div></td>'+
         '<td><div class="rowacts"><button class="btn ghost sm" data-edit="extra:'+x.id+'">แก้ไข</button>'+
         '<button class="btn ghost sm" data-del="extra:'+x.id+'">ลบ</button></div></td></tr>';
     }).join(""):'<tr><td colspan="11"><div class="empty">ยังไม่มีรายการงานเพิ่ม</div></td></tr>')+
@@ -415,7 +524,7 @@ function viewRfa(){
       '<td data-l="ครบกำหนดตอบ" class="num">'+(r.dueDate?thDate(r.dueDate):'<span class="muted">—</span>')+'</td>'+
       '<td data-l="สถานะ" class="c"><span class="pill '+(st==="idle"?"info":st)+'">'+esc(r.status||"—")+'</span>'+
         (r.decisionDate?'<div class="muted num" style="font-size:11px">'+thDate(r.decisionDate)+'</div>':'')+'</td>'+
-      '<td data-l="เอกสาร" class="c"><div><button class="clip'+(n?"":" add")+'" data-files="rfa:'+r.id+'">'+(n?"📎 "+n:"+ แนบ")+'</button></div></td>'+
+      '<td data-l="เอกสาร" class="c"><div>'+docChip("rfa",r)+'</div></td>'+
       '<td><div class="rowacts"><button class="btn ghost sm" data-edit="rfa:'+r.id+'">แก้ไข</button>'+
       '<button class="btn ghost sm" data-del="rfa:'+r.id+'">ลบ</button></div></td></tr>';
   }).join("") : '<tr><td colspan="13"><div class="empty">ไม่พบรายการตามเงื่อนไขที่เลือก</div></td></tr>')+
@@ -441,7 +550,7 @@ function viewEot(){
       '<td data-l="สิ้นสุดเดิม" class="num">'+thDate(e.oldEnd)+'</td><td data-l="สิ้นสุดใหม่" class="num" style="font-weight:600">'+thDate(e.newEnd)+'</td>'+
       '<td data-l="สถานะ" class="c"><span class="pill '+(ok?"paid":"due")+'">'+esc(e.status)+'</span>'+
         (e.decisionDate?'<div class="muted num" style="font-size:11px">'+thDate(e.decisionDate)+'</div>':'')+'</td>'+
-      '<td data-l="เอกสาร" class="c"><div><button class="clip'+(n?"":" add")+'" data-files="eot:'+e.id+'">'+(n?"📎 "+n:"+ แนบ")+'</button></div></td>'+
+      '<td data-l="เอกสาร" class="c"><div>'+docChip("eot",e)+'</div></td>'+
       '<td><div class="rowacts"><button class="btn ghost sm" data-edit="eot:'+e.id+'">แก้ไข</button>'+
       '<button class="btn ghost sm" data-del="eot:'+e.id+'">ลบ</button></div></td></tr>';
   }).join("");
@@ -472,7 +581,7 @@ function viewDocs(){
    '<div class="tablewrap"><table><thead><tr><th>ชื่อไฟล์</th><th>ผูกกับรายการ</th><th>ประเภท</th>'+
    '<th class="r">ขนาด</th><th>วันที่แนบ</th><th></th></tr></thead><tbody>'+
    (S.files.length?S.files.map(f=>'<tr><td data-l="ชื่อไฟล์">'+esc(f.name)+'</td><td data-l="ผูกกับรายการ" class="muted">'+esc(refLabel(f))+'</td>'+
-     '<td data-l="ประเภท" class="num muted">'+esc((f.name.split(".").pop()||"").toUpperCase())+'</td>'+
+     '<td data-l="ประเภท"><span class="pill info">'+esc(docMeta(f.refType,f.docType||"other")[1])+'</span></td>'+
      '<td data-l="ขนาด" class="r num">'+bytes(f.size)+'</td>'+
      '<td data-l="วันที่แนบ" class="num">'+thDate((f.createdAt||"").slice(0,10))+'</td>'+
      '<td><div class="rowacts"><button class="btn ghost sm" data-dl="'+f.id+'">ดาวน์โหลด</button>'+
@@ -607,38 +716,63 @@ function editContract(id){
 }
 
 /* ---------- attachment drawer ---------- */
+function refRecord(rt,id){
+  return (rt==="payment"?S.payments:rt==="extra"?S.extras:rt==="rfa"?S.rfas:S.eots).find(r=>r.id===id)||{id};
+}
 function openFiles(refType,refId){
+  const rec=refRecord(refType,refId);
   const title = refType==="payment"?"เอกสารแนบของงวดงาน":refType==="extra"?"เอกสารแนบของงานเพิ่ม":
     refType==="rfa"?"เอกสารแนบของรายการขออนุมัติ":"เอกสารแนบของคำขอขยายเวลา";
-  const render=()=>{
-    const list=filesFor(refType,refId);
-    $("#flist").innerHTML = list.length? list.map(f=>
-      '<div class="filerow"><div class="ic">'+esc((f.name.split(".").pop()||"?").slice(0,4).toUpperCase())+'</div>'+
+  const sub = refType==="payment"? (esc(rec.invoice||"")+" · งวดที่ "+(rec.seq||"—")) :
+              refType==="rfa"? esc(rec.title||"") : refType==="eot"? ("ครั้งที่ "+(rec.no||"")+" · "+esc(rec.docNo||"")) :
+              esc(rec.building||"");
+  const fileRow = f=>'<div class="filerow"><div class="ic">'+esc((f.name.split(".").pop()||"?").slice(0,4).toUpperCase())+'</div>'+
       '<div style="flex:1;min-width:0"><div class="nm">'+esc(f.name)+'</div>'+
       '<div class="mt">'+bytes(f.size)+' · '+thDate((f.createdAt||"").slice(0,10))+'</div></div>'+
-      '<button class="btn ghost sm" data-dl="'+f.id+'">บันทึก</button>'+
+      '<button class="btn ghost sm" data-dl="'+f.id+'">เปิด</button>'+
       '<button class="btn ghost sm" data-rmfile="'+f.id+'">ลบ</button></div>'+
-      (/^image\//.test(f.mime||"")?'<img class="thumb" data-img="'+f.id+'" alt="'+esc(f.name)+'">':"")
-    ).join("") : '<div class="empty">ยังไม่มีเอกสารแนบ</div>';
-    list.filter(f=>/^image\//.test(f.mime||"")).forEach(async f=>{
+      (/^image\//.test(f.mime||"")?'<img class="thumb" data-img="'+f.id+'" alt="'+esc(f.name)+'">':"");
+
+  const render=()=>{
+    const st=docState(refType,rec);
+    const types=DOC_TYPES[refType]||DOC_TYPES.payment;
+    $("#flist").innerHTML = types.map(([t,label,ab])=>{
+      const fs=st.files.filter(f=>(f.docType||"other")===t);
+      const need=st.need.includes(t);
+      return '<section class="docslot'+(fs.length?" filled":(need?" needed":""))+'">'+
+        '<header><span class="ab">'+ab+'</span><div><div class="lb">'+esc(label)+'</div>'+
+        '<div class="st">'+(fs.length? fs.length+" ไฟล์" : (need?"ยังไม่มี — จำเป็นต้องมี":"ยังไม่มี"))+'</div></div>'+
+        '<button class="btn sm" data-add="'+t+'">แนบ</button></header>'+
+        (fs.length? fs.map(fileRow).join("") : "")+'</section>';
+    }).join("");
+    st.files.filter(f=>/^image\//.test(f.mime||"")).forEach(async f=>{
       const el=document.querySelector('[data-img="'+f.id+'"]'); if(!el) return;
       try{ el.src=await Store.fileUrl(f); }catch(e){}
     });
   };
+
   $("#overlay").innerHTML='<div class="scrim" data-close="1" style="padding:0;align-items:stretch;justify-content:flex-end">'+
-    '<div class="drawer" role="dialog" aria-modal="true" data-stop="1">'+
-    '<div class="card-h"><h3>'+esc(title)+'</h3><button class="btn ghost sm" data-close="1">ปิด</button></div>'+
-    '<div class="card-b" style="display:grid;gap:14px;align-content:start">'+
-      '<div class="drop" id="drop">ลากไฟล์มาวาง หรือคลิกเพื่อเลือกไฟล์<br><span class="muted">PDF, รูปภาพ, เอกสาร — ไม่เกิน 4 MB ต่อไฟล์</span></div>'+
+    '<div class="drawer" role="dialog" aria-modal="true">'+
+    '<div class="card-h"><div><h3>'+esc(title)+'</h3><div class="muted" style="font-size:11.5px">'+sub+'</div></div>'+
+    '<button class="btn ghost sm" data-close="1">ปิด</button></div>'+
+    '<div class="card-b" style="display:grid;gap:12px;align-content:start">'+
+      '<div class="drop" id="drop">ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือก<br>'+
+      '<span class="muted">ระบบจะเดาประเภทจากชื่อไฟล์ให้ · ไม่เกิน 25 MB ต่อไฟล์</span></div>'+
       '<input type="file" id="fin" multiple hidden>'+
-      '<div id="flist"></div>'+
+      '<div id="flist" style="display:grid;gap:10px"></div>'+
     '</div></div></div>';
+
   const drop=$("#drop"), fin=$("#fin");
-  drop.onclick=()=>fin.click();
-  fin.onchange=async ()=>{ await uploadFiles([...fin.files],refType,refId); render(); };
+  let pendingType=null;
+  drop.onclick=()=>{ pendingType=null; fin.click(); };
+  fin.onchange=async ()=>{ await uploadFiles([...fin.files],refType,refId,pendingType); fin.value=""; render(); };
   ["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("hot");}));
   ["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("hot");}));
-  drop.addEventListener("drop",async e=>{ await uploadFiles([...e.dataTransfer.files],refType,refId); render(); });
+  drop.addEventListener("drop",async e=>{ await uploadFiles([...e.dataTransfer.files],refType,refId,null); render(); });
+  $("#flist").addEventListener("click",e=>{
+    const b=e.target.closest("[data-add]"); if(!b) return;
+    pendingType=b.dataset.add; fin.click();
+  });
   openFiles._render=render; render();
 }
 

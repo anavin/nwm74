@@ -99,11 +99,13 @@ create table if not exists nm74.files (          -- ทะเบียนเอ�
   mime         text,
   ref_type     text not null,                   -- payment | extra | rfa | eot
   ref_id       text not null,
+  doc_type     text default 'other',            -- invoice | report | slip | form | spec | drawing | letter | result | other
   storage_path text not null,
   created_at   timestamptz default now(),
   created_by   uuid default auth.uid()
 );
 create index if not exists files_ref_idx on nm74.files(ref_type, ref_id);
+create index if not exists files_type_idx on nm74.files(ref_type, ref_id, doc_type);
 
 -- ---------- updated_at อัตโนมัติ ----------
 create or replace function nm74.touch_updated_at() returns trigger

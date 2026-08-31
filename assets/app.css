@@ -106,18 +106,19 @@ a{color:var(--accent-ink)}
 .card-h .hint{font-size:11.5px;color:var(--ink-3);text-align:right}
 .card-b{padding:18px}
 .grid{display:grid;gap:14px}
-.kpis{gap:0;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));background:var(--surface);
+.kpis{gap:0;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));background:var(--surface);
   border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
 .kpi{background:var(--surface);padding:17px 19px 18px;border-right:1px solid var(--line);
   border-bottom:1px solid var(--line)}
 .kpi .lab{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
 .kpi .val{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
-  font-size:24px;font-weight:500;margin-top:9px;letter-spacing:-.03em;line-height:1.15}
+  font-size:21px;font-weight:500;margin-top:9px;letter-spacing:-.035em;line-height:1.2;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kpi .val small{font-size:12px;font-weight:400;color:var(--ink-3);margin-left:5px;letter-spacing:0}
 .kpi .note{font-size:11.5px;color:var(--ink-3);margin-top:7px;line-height:1.5}
-.kpi.hero{background:var(--surface)}
-.kpi.hero .val{color:var(--accent-ink)}
-.kpi.hero .lab{color:var(--brass)}
+.kpi.lead{background:var(--surface)}
+.kpi.lead .val{color:var(--accent-ink)}
+.kpi.lead .lab{color:var(--brass)}
 .kpi.warn .val{color:var(--due)}
 .kpi.bad .val{color:var(--late)}
 
@@ -235,6 +236,61 @@ td.c,th.c{text-align:center}
   #view{animation:fade .22s ease}
   @keyframes fade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 }
+
+/* ---------- แผงยอดค้างจ่าย (hero) ---------- */
+.hero{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:0;margin-bottom:16px;
+  background:var(--rail);color:var(--rail-ink);border-radius:var(--radius);overflow:hidden;
+  box-shadow:0 20px 50px -34px rgba(12,16,22,.7)}
+.hero-main{padding:24px 26px 26px;position:relative}
+.hero-main:after{content:"";position:absolute;left:26px;top:0;width:44px;height:2px;background:var(--brass)}
+.hero-lab{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--brass);font-weight:600}
+.hero-fig{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-size:46px;font-weight:500;
+  letter-spacing:-.04em;line-height:1.05;margin-top:14px}
+.hero-fig small{font-size:15px;font-weight:400;color:var(--rail-ink-2);margin-left:9px;letter-spacing:0}
+.hero-sub{font-size:12.5px;color:var(--rail-ink-2);margin-top:12px;line-height:1.6}
+.hero-sub .warn{color:var(--due);font-weight:600}
+.hero-split{padding:24px 26px;background:rgba(255,255,255,.035);display:flex;flex-direction:column;gap:11px;justify-content:center}
+.hs-row{display:grid;grid-template-columns:88px 1fr auto;align-items:center;gap:12px;font-size:12px}
+.hs-nm{color:var(--rail-ink-2)}
+.hs-bar{height:6px;border-radius:3px;background:rgba(255,255,255,.09);overflow:hidden}
+.hs-bar i{display:block;height:100%;background:var(--fill-due);border-radius:3px}
+.hs-val{font-size:12.5px;font-weight:600}
+.hs-foot{margin-top:6px;padding-top:11px;border-top:1px solid var(--rail-line);font-size:11.5px;color:var(--rail-ink-2)}
+
+/* ---------- อายุหนี้ ---------- */
+.agewrap{display:flex;align-items:center;gap:9px}
+.agebar{flex:1;height:5px;border-radius:3px;background:var(--sunken);overflow:hidden;min-width:46px}
+.agebar i{display:block;height:100%;background:var(--fill-due);border-radius:3px}
+.agebar.late i{background:var(--late)}
+.agelate{color:var(--late)}
+
+/* ---------- ตัวบ่งชี้เอกสาร ---------- */
+.docchip{display:inline-flex;gap:3px;align-items:center;background:none;border:0;padding:2px;cursor:pointer}
+.docchip i{font-style:normal;width:22px;height:22px;border-radius:4px;display:grid;place-items:center;
+  font-size:11px;font-weight:600;border:1px solid var(--line);color:var(--ink-3);background:var(--surface-2)}
+.docchip i.on{background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent-ink)}
+.docchip i.miss{border-style:dashed;border-color:var(--due);color:var(--due);background:transparent}
+.docchip:hover i{border-color:var(--accent)}
+.docchip .xtra{font-size:10.5px;color:var(--ink-3);font-family:"IBM Plex Mono",monospace;margin-left:2px}
+
+/* ---------- ช่องเอกสารในแผงแนบไฟล์ ---------- */
+.docslot{border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;background:var(--surface)}
+.docslot.needed{border-color:var(--due);background:var(--due-soft)}
+.docslot.filled{background:var(--surface)}
+.docslot header{display:flex;align-items:center;gap:11px}
+.docslot .ab{width:28px;height:28px;border-radius:5px;display:grid;place-items:center;flex:none;
+  background:var(--accent-soft);color:var(--accent-ink);font-weight:700;font-size:12px}
+.docslot.needed .ab{background:transparent;border:1px dashed var(--due);color:var(--due)}
+.docslot .lb{font-weight:600;font-size:13px}
+.docslot .st{font-size:11px;color:var(--ink-3)}
+.docslot header .btn{margin-left:auto}
+.docslot .filerow:last-child{border-bottom:0;padding-bottom:0}
+
+/* ---------- แถวงานที่ต้องติดตาม ---------- */
+.tk{display:flex;gap:11px;align-items:flex-start}
+.tk-t{font-weight:600;font-size:12.5px;line-height:1.45}
+.tk-s{font-size:11.5px;color:var(--ink-3);margin-top:2px}
+
 /* ---------- แถบบนสำหรับมือถือ ---------- */
 .mobilebar{display:none;align-items:center;gap:12px;padding:10px 14px;background:var(--rail);color:var(--rail-ink);
   position:sticky;top:0;z-index:45;border-bottom:1px solid var(--rail-line)}
@@ -287,10 +343,12 @@ td.c,th.c{text-align:center}
   td:before{content:attr(data-l);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);
     font-weight:600;flex:none;text-align:left;padding-top:2px}
   td:not([data-l]):before{content:none}
-  td[data-l="รายละเอียดงาน"],td[data-l="หมวดงาน"],td[data-l="เหตุผล / สาเหตุ"],td[data-l="ชื่อไฟล์"]{
+  td[data-l="รายละเอียดงาน"],td[data-l="หมวดงาน"],td[data-l="เหตุผล / สาเหตุ"],td[data-l="ชื่อไฟล์"],td[data-l="รายการ"]{
     display:block;text-align:left !important;padding:0 0 9px;margin-bottom:7px;border-bottom:1px dashed var(--line)}
   td[data-l="รายละเอียดงาน"]:before,td[data-l="หมวดงาน"]:before,
-  td[data-l="เหตุผล / สาเหตุ"]:before,td[data-l="ชื่อไฟล์"]:before{display:block;margin-bottom:4px}
+  td[data-l="เหตุผล / สาเหตุ"]:before,td[data-l="ชื่อไฟล์"]:before,
+  td[data-l="รายการ"]:before{display:block;margin-bottom:4px}
+  td[data-l="ยอดที่ต้องโอน"]{font-size:16px;font-weight:700}
   td[data-l="ยอดจ่ายจริง"]{font-size:15px;font-weight:600}
   .stripe{box-shadow:none !important}
   tbody tr:has(.stripe.late){border-left:3px solid var(--late)}
@@ -303,6 +361,14 @@ td.c,th.c{text-align:center}
   .rowacts .btn{padding:7px 12px}
   .clip{padding:7px 12px}
 
+  .hero{grid-template-columns:1fr}
+  .hero-main{padding:20px}
+  .hero-fig{font-size:34px}
+  .hero-split{padding:16px 20px 20px}
+  .hs-row{grid-template-columns:70px 1fr auto}
+  .agewrap{justify-content:flex-end}
+  .agebar{max-width:110px}
+  .docchip{justify-content:flex-end}
   .ctr-figs{gap:10px 16px}
   .legend{gap:12px}
 

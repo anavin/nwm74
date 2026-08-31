@@ -22,7 +22,7 @@ const MAPS = {
     brand:"brand", reviewer:"reviewer", leadDays:"lead_days", requiredOn:"required_on", dueDate:"due_date",
     submitDate:"submit_date", status:"status", decisionDate:"decision_date", note:"note"},
   files: {name:"name", size:"size", mime:"mime", refType:"ref_type", refId:"ref_id",
-    storagePath:"storage_path", createdAt:"created_at"}
+    docType:"doc_type", storagePath:"storage_path", createdAt:"created_at"}
 };
 const DATE_FIELDS = new Set(["end_date","req_date","paid_date","submit_date","old_end","new_end",
   "decision_date","required_on","due_date"]);
@@ -115,13 +115,13 @@ const Store = (() => {
 
   /* ---------------- storage ---------------- */
   const slug = s => (s || "file").normalize("NFC").replace(/[^\w.\-ก-๙]+/g, "_").slice(-80);
-  async function uploadFile(file, refType, refId){
-    const path = `${refType}/${refId}/${Date.now()}-${slug(file.name)}`;
+  async function uploadFile(file, refType, refId, docType){
+    const path = `${refType}/${refId}/${docType || "other"}-${Date.now()}-${slug(file.name)}`;
     const up = await sb.storage.from(BUCKET).upload(path, file, {contentType: file.type || undefined, upsert: false});
     if(up.error) throw up.error;
     const {error} = await sb.from("files").insert({
       name: file.name, size: file.size, mime: file.type || "application/octet-stream",
-      ref_type: refType, ref_id: refId, storage_path: path
+      ref_type: refType, ref_id: refId, doc_type: docType || "other", storage_path: path
     });
     if(error){ await sb.storage.from(BUCKET).remove([path]); throw error; }
   }
