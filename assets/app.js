@@ -169,6 +169,7 @@ function renderAll(){
   const v=VIEWS.find(x=>x.id===S.view)||VIEWS[0];
   renderNav();
   $("#viewTitle").textContent=v.label; $("#viewSub").textContent=v.sub;
+  const mb=$("#mbView"); if(mb) mb.textContent=v.label;
   $("#banner").innerHTML = S.mode==="db" ? "" :
     '<div class="banner">กำลังเชื่อมต่อฐานข้อมูล…</div>';
   ({dash:viewDash,pay:viewPay,extra:viewExtra,rfa:viewRfa,eot:viewEot,docs:viewDocs,setup:viewSetup}[S.view]||viewDash)();
@@ -310,15 +311,15 @@ function viewPay(){
       '<th>วันที่โอน</th><th class="c">สถานะ</th><th class="c">เอกสาร</th><th></th></tr></thead><tbody>'+
       rows.map(p=>{
         const st=pstatus(p), age=daysBetween(p.reqDate), n=filesFor("payment",p.id).length;
-        return '<tr><td class="c stripe '+st+' num">'+p.seq+'</td>'+
-          '<td style="min-width:250px">'+esc(p.detail)+(p.note?'<div class="muted" style="font-size:11.5px">'+esc(p.note)+'</div>':'')+'</td>'+
-          '<td class="r num">'+money(p.amount)+'</td><td class="r num">'+(p.vat?money(p.vat):'<span class="muted">—</span>')+'</td>'+
-          '<td class="r num">'+(p.retention?money(p.retention):'<span class="muted">—</span>')+'</td>'+
-          '<td class="r num" style="font-weight:600">'+money(paidNet(p))+'</td>'+
-          '<td class="num">'+esc(p.invoice||"—")+'</td><td class="num">'+thDate(p.reqDate)+'</td>'+
-          '<td class="num">'+(p.paidDate?thDate(p.paidDate):'<span class="muted">—</span>')+'</td>'+
-          '<td class="c"><span class="pill '+st+'">'+statusLabel(st)+(st!=="paid"&&age!=null?" "+age+" วัน":"")+'</span></td>'+
-          '<td class="c"><div><button class="clip'+(n?"":" add")+'" data-files="payment:'+p.id+'">'+(n?"📎 "+n:"+ แนบ")+'</button></div></td>'+
+        return '<tr><td data-l="งวดที่" class="c stripe '+st+' num">'+p.seq+'</td>'+
+          '<td data-l="รายละเอียดงาน" style="min-width:250px">'+esc(p.detail)+(p.note?'<div class="muted" style="font-size:11.5px">'+esc(p.note)+'</div>':'')+'</td>'+
+          '<td data-l="มูลค่างวด" class="r num">'+money(p.amount)+'</td><td data-l="VAT" class="r num">'+(p.vat?money(p.vat):'<span class="muted">—</span>')+'</td>'+
+          '<td data-l="หักประกัน" class="r num">'+(p.retention?money(p.retention):'<span class="muted">—</span>')+'</td>'+
+          '<td data-l="ยอดจ่ายจริง" class="r num" style="font-weight:600">'+money(paidNet(p))+'</td>'+
+          '<td data-l="เลขที่ใบเบิก" class="num">'+esc(p.invoice||"—")+'</td><td data-l="วันที่เบิก" class="num">'+thDate(p.reqDate)+'</td>'+
+          '<td data-l="วันที่โอน" class="num">'+(p.paidDate?thDate(p.paidDate):'<span class="muted">—</span>')+'</td>'+
+          '<td data-l="สถานะ" class="c"><span class="pill '+st+'">'+statusLabel(st)+(st!=="paid"&&age!=null?" "+age+" วัน":"")+'</span></td>'+
+          '<td data-l="เอกสาร" class="c"><div><button class="clip'+(n?"":" add")+'" data-files="payment:'+p.id+'">'+(n?"📎 "+n:"+ แนบ")+'</button></div></td>'+
           '<td><div class="rowacts"><button class="btn ghost sm" data-edit="pay:'+p.id+'">แก้ไข</button>'+
           '<button class="btn ghost sm" data-del="pay:'+p.id+'">ลบ</button></div></td></tr>';
       }).join("")+
@@ -344,14 +345,14 @@ function viewExtra(){
     '<th class="c">สถานะ</th><th class="c">เอกสาร</th><th></th></tr></thead><tbody>'+
     (S.extras.length?S.extras.map(x=>{
       const st=pstatus(x), n=filesFor("extra",x.id).length;
-      return '<tr><td class="stripe '+st+'">'+esc(x.building)+'</td>'+
-        '<td style="min-width:260px">'+esc(x.detail)+(x.note?'<div class="muted" style="font-size:11.5px">'+esc(x.note)+'</div>':'')+'</td>'+
-        '<td class="r num">'+money(x.amount)+'</td><td class="r num">'+(x.discount?money(x.discount):'<span class="muted">—</span>')+'</td>'+
-        '<td class="r num" style="font-weight:600">'+money(paidNet(x))+'</td>'+
-        '<td class="num">'+esc(x.invoice||"—")+'</td><td class="num">'+thDate(x.reqDate)+'</td>'+
-        '<td class="num">'+(x.paidDate?thDate(x.paidDate):'<span class="muted">—</span>')+'</td>'+
-        '<td class="c"><span class="pill '+st+'">'+statusLabel(st)+'</span></td>'+
-        '<td class="c"><div><button class="clip'+(n?"":" add")+'" data-files="extra:'+x.id+'">'+(n?"📎 "+n:"+ แนบ")+'</button></div></td>'+
+      return '<tr><td data-l="อาคาร" class="stripe '+st+'">'+esc(x.building)+'</td>'+
+        '<td data-l="รายละเอียดงาน" style="min-width:260px">'+esc(x.detail)+(x.note?'<div class="muted" style="font-size:11.5px">'+esc(x.note)+'</div>':'')+'</td>'+
+        '<td data-l="มูลค่างาน" class="r num">'+money(x.amount)+'</td><td data-l="ส่วนลด" class="r num">'+(x.discount?money(x.discount):'<span class="muted">—</span>')+'</td>'+
+        '<td data-l="ยอดจ่ายจริง" class="r num" style="font-weight:600">'+money(paidNet(x))+'</td>'+
+        '<td data-l="เลขที่ใบเบิก" class="num">'+esc(x.invoice||"—")+'</td><td data-l="วันที่เบิก" class="num">'+thDate(x.reqDate)+'</td>'+
+        '<td data-l="วันที่โอน" class="num">'+(x.paidDate?thDate(x.paidDate):'<span class="muted">—</span>')+'</td>'+
+        '<td data-l="สถานะ" class="c"><span class="pill '+st+'">'+statusLabel(st)+'</span></td>'+
+        '<td data-l="เอกสาร" class="c"><div><button class="clip'+(n?"":" add")+'" data-files="extra:'+x.id+'">'+(n?"📎 "+n:"+ แนบ")+'</button></div></td>'+
         '<td><div class="rowacts"><button class="btn ghost sm" data-edit="extra:'+x.id+'">แก้ไข</button>'+
         '<button class="btn ghost sm" data-del="extra:'+x.id+'">ลบ</button></div></td></tr>';
     }).join(""):'<tr><td colspan="11"><div class="empty">ยังไม่มีรายการงานเพิ่ม</div></td></tr>')+
@@ -399,22 +400,22 @@ function viewRfa(){
   (rows.length? rows.map(r=>{
     const st=rfaState(r), dl=rfaDeadline(r), n=filesFor("rfa",r.id).length;
     const lateDl = dl && dl<today && st!=="paid";
-    return '<tr><td class="stripe '+(st==="idle"?"":st)+'" style="min-width:230px">'+
+    return '<tr><td data-l="หมวดงาน" class="stripe '+(st==="idle"?"":st)+'" style="min-width:230px">'+
       '<div style="font-weight:600">'+esc(r.title||"—")+'</div>'+
       '<div class="muted" style="font-size:12px">'+esc(r.detail||"")+'</div>'+
       (r.note?'<div class="muted" style="font-size:11.5px">'+esc(r.note)+'</div>':'')+'</td>'+
-      '<td style="font-size:12px">'+esc(r.category||"—")+'</td>'+
-      '<td class="num">'+esc(r.docNo||"—")+'</td>'+
-      '<td style="font-size:12.5px">'+(r.brand?esc(r.brand):'<span class="muted">—</span>')+'</td>'+
-      '<td style="font-size:12.5px">'+esc(r.reviewer||"—")+'</td>'+
-      '<td class="c num">'+(r.leadDays?r.leadDays+" วัน":'<span class="muted">—</span>')+'</td>'+
-      '<td class="num">'+(r.requiredOn?thDate(r.requiredOn):'<span class="muted">—</span>')+'</td>'+
-      '<td class="num" style="font-weight:600'+(lateDl?";color:var(--late)":"")+'">'+(dl?thDate(dl):'<span class="muted">—</span>')+'</td>'+
-      '<td class="num">'+(r.submitDate?thDate(r.submitDate):'<span class="muted">—</span>')+'</td>'+
-      '<td class="num">'+(r.dueDate?thDate(r.dueDate):'<span class="muted">—</span>')+'</td>'+
-      '<td class="c"><span class="pill '+(st==="idle"?"info":st)+'">'+esc(r.status||"—")+'</span>'+
+      '<td data-l="ประเภท" style="font-size:12px">'+esc(r.category||"—")+'</td>'+
+      '<td data-l="เลขที่เอกสาร" class="num">'+esc(r.docNo||"—")+'</td>'+
+      '<td data-l="ยี่ห้อ / รุ่น" style="font-size:12.5px">'+(r.brand?esc(r.brand):'<span class="muted">—</span>')+'</td>'+
+      '<td data-l="ผู้พิจารณา" style="font-size:12.5px">'+esc(r.reviewer||"—")+'</td>'+
+      '<td data-l="Lead time" class="c num">'+(r.leadDays?r.leadDays+" วัน":'<span class="muted">—</span>')+'</td>'+
+      '<td data-l="ต้องใช้งาน" class="num">'+(r.requiredOn?thDate(r.requiredOn):'<span class="muted">—</span>')+'</td>'+
+      '<td data-l="ต้องอนุมัติภายใน" class="num" style="font-weight:600'+(lateDl?";color:var(--late)":"")+'">'+(dl?thDate(dl):'<span class="muted">—</span>')+'</td>'+
+      '<td data-l="วันที่ยื่น" class="num">'+(r.submitDate?thDate(r.submitDate):'<span class="muted">—</span>')+'</td>'+
+      '<td data-l="ครบกำหนดตอบ" class="num">'+(r.dueDate?thDate(r.dueDate):'<span class="muted">—</span>')+'</td>'+
+      '<td data-l="สถานะ" class="c"><span class="pill '+(st==="idle"?"info":st)+'">'+esc(r.status||"—")+'</span>'+
         (r.decisionDate?'<div class="muted num" style="font-size:11px">'+thDate(r.decisionDate)+'</div>':'')+'</td>'+
-      '<td class="c"><div><button class="clip'+(n?"":" add")+'" data-files="rfa:'+r.id+'">'+(n?"📎 "+n:"+ แนบ")+'</button></div></td>'+
+      '<td data-l="เอกสาร" class="c"><div><button class="clip'+(n?"":" add")+'" data-files="rfa:'+r.id+'">'+(n?"📎 "+n:"+ แนบ")+'</button></div></td>'+
       '<td><div class="rowacts"><button class="btn ghost sm" data-edit="rfa:'+r.id+'">แก้ไข</button>'+
       '<button class="btn ghost sm" data-del="rfa:'+r.id+'">ลบ</button></div></td></tr>';
   }).join("") : '<tr><td colspan="13"><div class="empty">ไม่พบรายการตามเงื่อนไขที่เลือก</div></td></tr>')+
@@ -433,14 +434,14 @@ function viewEot(){
   const rows=S.eots.map(e=>{
     acc+=Number(e.days||0);
     const n=filesFor("eot",e.id).length, ok=e.status==="อนุมัติแล้ว";
-    return '<tr><td class="c stripe '+(ok?"paid":"due")+' num" style="font-weight:600">'+e.no+'</td>'+
-      '<td style="min-width:300px">'+esc(e.reason)+(e.note?'<div class="muted" style="font-size:11.5px">'+esc(e.note)+'</div>':'')+'</td>'+
-      '<td class="num">'+esc(e.docNo)+'</td><td class="num">'+thDate(e.submitDate)+'</td>'+
-      '<td class="c num" style="font-weight:600">'+e.days+'</td><td class="c num">'+acc+'</td>'+
-      '<td class="num">'+thDate(e.oldEnd)+'</td><td class="num" style="font-weight:600">'+thDate(e.newEnd)+'</td>'+
-      '<td class="c"><span class="pill '+(ok?"paid":"due")+'">'+esc(e.status)+'</span>'+
+    return '<tr><td data-l="ครั้งที่" class="c stripe '+(ok?"paid":"due")+' num" style="font-weight:600">'+e.no+'</td>'+
+      '<td data-l="เหตุผล / สาเหตุ" style="min-width:300px">'+esc(e.reason)+(e.note?'<div class="muted" style="font-size:11.5px">'+esc(e.note)+'</div>':'')+'</td>'+
+      '<td data-l="เลขที่เอกสาร" class="num">'+esc(e.docNo)+'</td><td data-l="วันที่ยื่น" class="num">'+thDate(e.submitDate)+'</td>'+
+      '<td data-l="ขอขยาย (วัน)" class="c num" style="font-weight:600">'+e.days+'</td><td data-l="รวมสะสม" class="c num">'+acc+'</td>'+
+      '<td data-l="สิ้นสุดเดิม" class="num">'+thDate(e.oldEnd)+'</td><td data-l="สิ้นสุดใหม่" class="num" style="font-weight:600">'+thDate(e.newEnd)+'</td>'+
+      '<td data-l="สถานะ" class="c"><span class="pill '+(ok?"paid":"due")+'">'+esc(e.status)+'</span>'+
         (e.decisionDate?'<div class="muted num" style="font-size:11px">'+thDate(e.decisionDate)+'</div>':'')+'</td>'+
-      '<td class="c"><div><button class="clip'+(n?"":" add")+'" data-files="eot:'+e.id+'">'+(n?"📎 "+n:"+ แนบ")+'</button></div></td>'+
+      '<td data-l="เอกสาร" class="c"><div><button class="clip'+(n?"":" add")+'" data-files="eot:'+e.id+'">'+(n?"📎 "+n:"+ แนบ")+'</button></div></td>'+
       '<td><div class="rowacts"><button class="btn ghost sm" data-edit="eot:'+e.id+'">แก้ไข</button>'+
       '<button class="btn ghost sm" data-del="eot:'+e.id+'">ลบ</button></div></td></tr>';
   }).join("");
@@ -470,10 +471,10 @@ function viewDocs(){
    '<span class="hint">'+S.files.length+' ไฟล์ · รวม '+bytes(S.files.reduce((s,f)=>s+Number(f.size||0),0))+'</span></div>'+
    '<div class="tablewrap"><table><thead><tr><th>ชื่อไฟล์</th><th>ผูกกับรายการ</th><th>ประเภท</th>'+
    '<th class="r">ขนาด</th><th>วันที่แนบ</th><th></th></tr></thead><tbody>'+
-   (S.files.length?S.files.map(f=>'<tr><td>'+esc(f.name)+'</td><td class="muted">'+esc(refLabel(f))+'</td>'+
-     '<td class="num muted">'+esc((f.name.split(".").pop()||"").toUpperCase())+'</td>'+
-     '<td class="r num">'+bytes(f.size)+'</td>'+
-     '<td class="num">'+thDate((f.createdAt||"").slice(0,10))+'</td>'+
+   (S.files.length?S.files.map(f=>'<tr><td data-l="ชื่อไฟล์">'+esc(f.name)+'</td><td data-l="ผูกกับรายการ" class="muted">'+esc(refLabel(f))+'</td>'+
+     '<td data-l="ประเภท" class="num muted">'+esc((f.name.split(".").pop()||"").toUpperCase())+'</td>'+
+     '<td data-l="ขนาด" class="r num">'+bytes(f.size)+'</td>'+
+     '<td data-l="วันที่แนบ" class="num">'+thDate((f.createdAt||"").slice(0,10))+'</td>'+
      '<td><div class="rowacts"><button class="btn ghost sm" data-dl="'+f.id+'">ดาวน์โหลด</button>'+
      '<button class="btn ghost sm" data-rmfile="'+f.id+'">ลบ</button></div></td></tr>').join("")
     :'<tr><td colspan="6"><div class="empty">ยังไม่มีเอกสารแนบ — แนบได้จากปุ่ม 📎 ในแต่ละรายการ</div></td></tr>')+
@@ -685,7 +686,7 @@ document.addEventListener("click",async e=>{
   if(e.target.classList && e.target.classList.contains("scrim")){ closeOverlay(); return; }
   const t=e.target.closest("[data-view],[data-act],[data-edit],[data-del],[data-files],[data-dl],[data-rmfile]");
   if(!t) return;
-  if(t.dataset.view){ S.view=t.dataset.view; S.filter={contract:"",status:"",q:""}; renderAll(); return; }
+  if(t.dataset.view){ S.view=t.dataset.view; S.filter={contract:"",status:"",q:""}; closeNav(); renderAll(); window.scrollTo({top:0}); return; }
   if(t.dataset.act){
     const a=t.dataset.act;
     if(a==="new-pay") editPayment(null);
@@ -720,6 +721,18 @@ document.addEventListener("input",e=>{
   S.filter.q=f.value; S._focusQ=true; clearTimeout(window._qt); window._qt=setTimeout(renderAll,220);
 });
 document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeOverlay(); });
+function openNav(){ document.querySelector(".rail").classList.add("open");
+  const sc=$("#navScrim"); if(sc) sc.hidden=false;
+  const b=$("#navToggle"); if(b) b.setAttribute("aria-expanded","true"); }
+function closeNav(){ document.querySelector(".rail").classList.remove("open");
+  const sc=$("#navScrim"); if(sc) sc.hidden=true;
+  const b=$("#navToggle"); if(b) b.setAttribute("aria-expanded","false"); }
+(function(){
+  const b=$("#navToggle"), sc=$("#navScrim");
+  if(b) b.onclick=()=>document.querySelector(".rail").classList.contains("open")?closeNav():openNav();
+  if(sc) sc.onclick=closeNav;
+  addEventListener("keydown",e=>{ if(e.key==="Escape") closeNav(); });
+})();
 $("#themeBtn").onclick=()=>{
   const cur=document.documentElement.getAttribute("data-theme");
   const dark=cur? cur==="dark" : matchMedia("(prefers-color-scheme: dark)").matches;
