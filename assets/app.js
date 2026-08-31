@@ -174,10 +174,10 @@ function missingLabel(rt,rec){
 }
 
 /* ============================ files ============================ */
-const MAX_FILE = 25*1024*1024;
+const MAX_FILE = 50*1024*1024;
 async function uploadFiles(list, refType, refId, docType){
   for(const f of list){
-    if(f.size>MAX_FILE){ toast("ไฟล์ "+f.name+" ใหญ่เกิน 25 MB"); continue; }
+    if(f.size>MAX_FILE){ toast("ไฟล์ "+f.name+" ใหญ่เกิน 50 MB"); continue; }
     const t = docType || guessType(f.name, refType);
     try{ await Store.uploadFile(f,refType,refId,t); toast("แนบ "+f.name+" เป็น "+docMeta(refType,t)[1]); }
     catch(e){ toast("อัปโหลดไม่สำเร็จ: "+(e.message||e)); }
@@ -205,6 +205,7 @@ const VIEWS=[
   {id:"extra", label:"งานเพิ่ม (นอกสัญญา)", sub:"งานที่เกิดขึ้นนอกเหนือสัญญาและใบเบิกที่เกี่ยวข้อง"},
   {id:"rfa",   label:"งานขออนุมัติ (RFA)", sub:"ทะเบียนขออนุมัติวัสดุ อุปกรณ์ งานระบบ และแบบขยาย พร้อมกำหนดวันที่ต้องอนุมัติ"},
   {id:"eot",   label:"ขอขยายระยะเวลา", sub:"คำขอขยายเวลาก่อสร้าง สถานะอนุมัติ และไทม์ไลน์สัญญา"},
+  {id:"import",label:"นำเข้าเอกสาร", sub:"เลือกทั้งโฟลเดอร์แล้วให้ระบบจับคู่ไฟล์กับงวดงาน สัญญา และรายการอนุมัติให้อัตโนมัติ"},
   {id:"docs",  label:"คลังเอกสาร", sub:"เอกสารแนบทั้งหมดของโครงการ"},
   {id:"setup", label:"สัญญาและผู้รับจ้าง", sub:"ข้อมูลสัญญา มูลค่า เงื่อนไข และบัญชีรับเงิน"}
 ];
@@ -222,7 +223,7 @@ function renderAll(){
   const mb=$("#mbView"); if(mb) mb.textContent=v.label;
   $("#banner").innerHTML = S.mode==="db" ? "" :
     '<div class="banner">กำลังเชื่อมต่อฐานข้อมูล…</div>';
-  ({dash:viewDash,pay:viewPay,extra:viewExtra,rfa:viewRfa,eot:viewEot,docs:viewDocs,setup:viewSetup}[S.view]||viewDash)();
+  ({dash:viewDash,pay:viewPay,extra:viewExtra,rfa:viewRfa,eot:viewEot,import:viewImport,docs:viewDocs,setup:viewSetup}[S.view]||viewDash)();
 }
 function tools(html){ $("#viewTools").innerHTML=html; }
 
@@ -571,6 +572,140 @@ function viewEot(){
    '<div class="card"><div class="card-h"><h3>ไทม์ไลน์</h3></div><div class="card-b">'+timelineHTML()+'</div></div>';
 }
 
+
+/* ============================ นำเข้าเอกสารทั้งโฟลเดอร์ ============================ */
+const MONTH_TO_CM = {"มิ.ย":4,"มิถุนายน":4,"ก.ค":5,"กรกฎาคม":5,"ส.ค":6,"สิงหาคม":6,"พ.ค":3,"พฤษภาคม":3,"เม.ย":2,"เมษายน":2,"มี.ค":1,"มีนาคม":1};
+const normKey = t => String(t||"").toUpperCase().replace(/[\s_\/\-.]/g,"");
+function targets(){
+  const out=[];
+  S.contracts.forEach(c=>out.push({v:"contract:"+c.id,t:"สัญญา · "+c.code}));
+  S.contracts.forEach(c=>S.payments.filter(p=>p.contractId===c.id).forEach(p=>
+    out.push({v:"payment:"+p.id,t:c.code+" · งวดที่ "+p.seq+" ("+(p.invoice||"—")+")"})));
+  S.extras.forEach(x=>out.push({v:"extra:"+x.id,t:"งานเพิ่ม · "+x.building+" ("+(x.invoice||"—")+")"}));
+  S.rfas.forEach(r=>out.push({v:"rfa:"+r.id,t:"ขออนุมัติ · "+(r.title||"")}));
+  S.eots.forEach(e=>out.push({v:"eot:"+e.id,t:"ขยายเวลาครั้งที่ "+e.no+" ("+e.docNo+")"}));
+  return out;
+}
+function planFile(name){
+  const n=name, low=n.toLowerCase(), isImg=/\.(jpe?g|png|heic|webp)$/i.test(n);
+  const isSlip=/slip|สลิป/i.test(n);
+  const pick=(rt,id,dt)=>({rt,id,dt});
+  let m;
+  /* สัญญาก่อสร้าง */
+  if(/สัญญาก่อสร้าง/.test(n)){
+    const c=/3[-\s]?ชั้น/.test(n)?"c2":/2[-\s]?ชั้น/.test(n)?"c1":null;
+    if(c) return pick("contract",c,"contract");
+  }
+  /* ขอขยายระยะเวลา */
+  if((m=n.match(/ขอขยายระยะเวลา.*?ครั้งที่\s*(\d+)/))){
+    const e=S.eots.find(x=>String(x.no)===m[1]); if(e) return pick("eot",e.id,"letter");
+  }
+  /* งานเพิ่ม (PPH-04) */
+  if(/งานเพิ่ม|PPH[-_ ]?0?4[^0-9]/i.test(n)){
+    const x=S.extras[0]; if(x) return pick("extra",x.id,isSlip||isImg?"slip":"invoice");
+  }
+  /* รายงานประจำเดือนของ CM */
+  if(/รายงานประจำเดือน/.test(n)){
+    const key=Object.keys(MONTH_TO_CM).find(k=>n.includes(k));
+    const c3=S.contracts.find(c=>/CM/i.test(c.code));
+    if(key&&c3){ const p=S.payments.find(p=>p.contractId===c3.id&&p.seq===MONTH_TO_CM[key]);
+      if(p) return pick("payment",p.id,"report"); }
+  }
+  /* จับจากเลขที่ใบเบิกที่มีอยู่จริงในระบบ */
+  const nk=normKey(n);
+  for(const p of S.payments){
+    const inv=normKey(p.invoice); if(!inv||inv.length<5) continue;
+    const short=inv.replace(/([A-Z]+)0*(\d+)/,"$1$2");
+    if(nk.includes(inv)||nk.includes(short)) return pick("payment",p.id,isSlip||isImg?"slip":"invoice");
+  }
+  /* อาคาร 2/3 ชั้น + เบิกงวด N */
+  if((m=n.match(/อาคาร[-\s]?([23])[-\s]?ชั้น[\s\S]*?งวด[-\s]?(\d+)/))||
+     (m=n.match(/งวด[-\s]?(\d+)[\s\S]*?อาคาร[-\s]?([23])[-\s]?ชั้น/))&&(m=[m[0],m[2],m[1]])){
+    const cid=m[1]==="2"?"c1":"c2";
+    const p=S.payments.find(p=>p.contractId===cid&&p.seq===Number(m[2]));
+    if(p) return pick("payment",p.id,isSlip||isImg?"slip":"invoice");
+  }
+  /* CM-P92 งวด N */
+  if(/CM[-\s]?P?92/i.test(n)&&(m=n.match(/งวด\s?(\d+)/))){
+    const c3=S.contracts.find(c=>/CM/i.test(c.code));
+    const p=c3&&S.payments.find(p=>p.contractId===c3.id&&p.seq===Number(m[1]));
+    if(p) return pick("payment",p.id, isSlip||isImg?"slip":(/ใบเสร็จ/.test(n)?"other":"invoice"));
+  }
+  /* ใบสรุปเอกสารประกอบการเบิก */
+  if(/สรุปเอกสารเบิก/.test(n)&&(m=n.match(/งวดที่\s*(\d+)\s*ตึก\s*3/))){
+    const p=S.payments.find(p=>p.contractId==="c2"&&p.seq===Number(m[1]));
+    if(p) return pick("payment",p.id,"other");
+  }
+  /* เอกสารลิฟต์ */
+  if(/lift|ลิฟต์|schneider|mrl/i.test(n)){
+    const r=S.rfas.find(r=>/ลิฟต์/.test(r.trade||r.title||"")); 
+    if(r) return pick("rfa",r.id, /spec|สเปค/i.test(n)?"spec":/rev|drawing|group/i.test(n)?"drawing":"other");
+  }
+  return {rt:"",id:"",dt:"other"};
+}
+function viewImport(){
+  tools('<button class="btn" data-act="imp-pick">เลือกไฟล์</button>'+
+        '<button class="btn primary" data-act="imp-folder">เลือกทั้งโฟลเดอร์</button>');
+  const rows=S.imp||[];
+  const opts=targets();
+  const ready=rows.filter(r=>r.rt&&!r.done&&!r.tooBig);
+  $("#view").innerHTML=
+   '<input type="file" id="impFiles" multiple hidden><input type="file" id="impDir" webkitdirectory directory multiple hidden>'+
+   (rows.length? '' : '<div class="card" style="margin-bottom:16px"><div class="card-b" style="line-height:1.8">'+
+     '<h3 style="margin-bottom:6px">นำเข้าเอกสารครั้งละหลายไฟล์</h3>'+
+     '<p class="muted">กด “เลือกทั้งโฟลเดอร์” แล้วเลือกโฟลเดอร์ที่เก็บเอกสารโครงการ ระบบจะอ่านชื่อไฟล์ '+
+     'แล้วจับคู่กับงวดงาน สัญญา งานเพิ่ม คำขอขยายเวลา และรายการขออนุมัติให้อัตโนมัติ '+
+     'พร้อมเดาว่าเป็นใบเบิก รายงาน หรือสลิปโอนเงิน — ตรวจแล้วแก้ได้ก่อนกดอัปโหลด</p></div></div>')+
+   (rows.length?
+   '<div class="card"><div class="card-h"><h3>ตรวจก่อนอัปโหลด</h3>'+
+   '<span class="hint">'+rows.length+' ไฟล์ · จับคู่ได้ '+rows.filter(r=>r.rt).length+' · '+
+   'อัปโหลดแล้ว '+rows.filter(r=>r.done).length+'</span></div>'+
+   '<div class="tablewrap"><table><thead><tr><th>ชื่อไฟล์</th><th class="r">ขนาด</th>'+
+   '<th>แนบเข้ากับ</th><th>ประเภท</th><th class="c">สถานะ</th></tr></thead><tbody>'+
+   rows.map((r,i)=>{
+     const dts=DOC_TYPES[r.rt]||DOC_TYPES.payment;
+     return '<tr><td data-l="ชื่อไฟล์">'+esc(r.file.name)+'</td>'+
+       '<td data-l="ขนาด" class="r num'+(r.tooBig?' agelate':'')+'">'+bytes(r.file.size)+'</td>'+
+       '<td data-l="แนบเข้ากับ"><select data-imp="'+i+'" data-f="rt"><option value="">— ยังไม่จับคู่ —</option>'+
+         opts.map(o=>'<option value="'+o.v+'"'+((r.rt+":"+r.id)===o.v?" selected":"")+'>'+esc(o.t)+'</option>').join("")+'</select></td>'+
+       '<td data-l="ประเภท"><select data-imp="'+i+'" data-f="dt">'+
+         dts.map(d=>'<option value="'+d[0]+'"'+(r.dt===d[0]?" selected":"")+'>'+esc(d[1])+'</option>').join("")+'</select></td>'+
+       '<td data-l="สถานะ" class="c">'+(r.done?'<span class="pill paid">อัปโหลดแล้ว</span>':
+          r.tooBig?'<span class="pill late">ไฟล์ใหญ่เกิน</span>':
+          r.err?'<span class="pill late">'+esc(r.err)+'</span>':
+          r.rt?'<span class="pill due">พร้อมอัปโหลด</span>':'<span class="pill info">ต้องเลือกเอง</span>')+'</td></tr>';
+   }).join("")+
+   '</tbody></table></div>'+
+   '<div class="card-b" style="display:flex;gap:10px;align-items:center;justify-content:flex-end;border-top:1px solid var(--line)">'+
+   '<span class="muted" id="impMsg">พร้อมอัปโหลด '+ready.length+' ไฟล์</span>'+
+   '<button class="btn primary" data-act="imp-run"'+(ready.length?'':' disabled')+'>อัปโหลด '+ready.length+' ไฟล์</button>'+
+   '</div></div>' : '');
+  const fi=$("#impFiles"), di=$("#impDir");
+  const take=list=>{
+    S.imp=[...list].filter(f=>!/^\./.test(f.name)&&!/\.(ds_store)$/i.test(f.name)).map(f=>{
+      const g=planFile(f.webkitRelativePath||f.name);
+      return {file:f, rt:g.rt, id:g.id, dt:g.dt, tooBig:f.size>MAX_FILE, done:false, err:""};
+    });
+    renderAll();
+  };
+  if(fi) fi.onchange=()=>take(fi.files);
+  if(di) di.onchange=()=>take(di.files);
+}
+async function runImport(){
+  const rows=(S.imp||[]).filter(r=>r.rt&&!r.done&&!r.tooBig);
+  const msg=$("#impMsg");
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i];
+    if(msg) msg.textContent="กำลังอัปโหลด "+(i+1)+"/"+rows.length+" — "+r.file.name;
+    try{ await Store.uploadFile(r.file, r.rt, r.id, r.dt); r.done=true; }
+    catch(e){ r.err=(e.message||String(e)).slice(0,40); }
+  }
+  await refresh();
+  const ok=(S.imp||[]).filter(r=>r.done).length;
+  toast("อัปโหลดสำเร็จ "+ok+" ไฟล์");
+  renderAll();
+}
+
 /* ---------- docs ---------- */
 function viewDocs(){
   tools("");
@@ -769,7 +904,7 @@ function openFiles(refType,refId){
     '<button class="btn ghost sm" data-close="1">ปิด</button></div>'+
     '<div class="card-b" style="display:grid;gap:12px;align-content:start">'+
       '<div class="drop" id="drop">ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือก<br>'+
-      '<span class="muted">ระบบจะเดาประเภทจากชื่อไฟล์ให้ · ไม่เกิน 25 MB ต่อไฟล์</span></div>'+
+      '<span class="muted">ระบบจะเดาประเภทจากชื่อไฟล์ให้ · ไม่เกิน 50 MB ต่อไฟล์</span></div>'+
       '<input type="file" id="fin" multiple hidden>'+
       '<div id="flist" style="display:grid;gap:10px"></div>'+
     '</div></div></div>';
@@ -839,6 +974,9 @@ document.addEventListener("click",async e=>{
     if(a==="new-extra") editExtra(null);
     if(a==="new-eot") editEot(null);
     if(a==="new-rfa") editRfa(null);
+    if(a==="imp-pick") $("#impFiles").click();
+    if(a==="imp-folder") $("#impDir").click();
+    if(a==="imp-run") runImport();
     if(a==="export-rfa") saveCSV("งานขออนุมัติ-มหาวิหารเก้าฟ้า.csv",rfaRows());
     if(a==="new-contract") editContract(null);
     if(a==="export-pay") saveCSV("งวดงาน-มหาวิหารเก้าฟ้า.csv",payRows());
@@ -859,6 +997,13 @@ document.addEventListener("click",async e=>{
   if(t.dataset.rmfile){ const f=S.files.find(x=>x.id===t.dataset.rmfile); if(f){ await deleteFile(f); if(openFiles._render) openFiles._render(); } return; }
 });
 document.addEventListener("change",e=>{
+  const im=e.target.closest("[data-imp]");
+  if(im){ const i=+im.dataset.imp, row=S.imp[i];
+    if(im.dataset.f==="rt"){ const [rt,id]=(im.value||":").split(":"); row.rt=rt; row.id=id;
+      if(rt&&!(DOC_TYPES[rt]||[]).some(d=>d[0]===row.dt)) row.dt=planFile(row.file.name).dt;
+      if(rt&&!(DOC_TYPES[rt]||[]).some(d=>d[0]===row.dt)) row.dt="other"; }
+    else row.dt=im.value;
+    renderAll(); return; }
   const f=e.target.closest("[data-filter]"); if(!f) return;
   S.filter[f.dataset.filter]=f.value; renderAll();
 });

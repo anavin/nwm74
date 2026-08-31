@@ -141,7 +141,7 @@ end $$;
 
 -- ---------- Storage bucket สำหรับเอกสารแนบ ----------
 insert into storage.buckets (id, name, public, file_size_limit)
-values ('nm74-files', 'nm74-files', false, 26214400)
+values ('nm74-files', 'nm74-files', false, 52428800)
 on conflict (id) do nothing;
 
 drop policy if exists "nm74_files_read"   on storage.objects;
