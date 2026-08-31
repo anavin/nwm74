@@ -129,12 +129,15 @@ const DOC_TYPES = {
   payment:[["invoice","ใบเบิก","บ"],["report","รายงานงวดงาน","ร"],["slip","สลิปโอนเงิน","ส"],["other","อื่นๆ","อ"]],
   extra:  [["invoice","ใบเบิก","บ"],["report","รายงาน / รูปงาน","ร"],["slip","สลิปโอนเงิน","ส"],["other","อื่นๆ","อ"]],
   rfa:    [["form","แบบฟอร์ม RFA","ฟ"],["spec","แคตตาล็อก / สเปก","ค"],["drawing","Shop Drawing","ด"],["result","ผลอนุมัติ","ผ"],["other","อื่นๆ","อ"]],
+  contract:[["contract","สัญญาก่อสร้าง","ส"],["drawing","แบบก่อสร้าง","บ"],["boq","BOQ / ราคากลาง","ค"],
+            ["annex","เอกสารแนบท้าย / แก้ไขสัญญา","น"],["other","อื่นๆ","อ"]],
   eot:    [["letter","หนังสือขอขยายเวลา","น"],["form","แบบฟอร์ม RFA","ฟ"],["support","เอกสารประกอบ","ป"],["result","ผลอนุมัติ","ผ"],["other","อื่นๆ","อ"]]
 };
 const docMeta=(rt,t)=>(DOC_TYPES[rt]||DOC_TYPES.payment).find(x=>x[0]===t)||["other","อื่นๆ","อ"];
 const GUESS=[[/สลิป|slip|โอน|transfer|pay[-_ ]?in/i,"slip"],[/ใบเบิก|เบิก|invoice|บิล|แจ้งหนี้|pph|nt20/i,"invoice"],
   [/รายงาน|report|ตรวจ|inspect|progress/i,"report"],[/shop|drawing|แบบขยาย|dwg/i,"drawing"],
-  [/catalog|แคตตาล็อก|spec|สเปค|brochure/i,"spec"],[/rfa|ฟอร์ม/i,"form"],[/หนังสือ|letter/i,"letter"],
+  [/catalog|แคตตาล็อก|spec|สเปค|brochure/i,"spec"],[/สัญญา|contract|agreement/i,"contract"],
+  [/boq|ราคากลาง|ปริมาณงาน/i,"boq"],[/แนบท้าย|annex|addendum|แก้ไขสัญญา/i,"annex"],[/rfa|ฟอร์ม/i,"form"],[/หนังสือ|letter/i,"letter"],
   [/อนุมัติ|approve|result/i,"result"]];
 function guessType(name,refType){
   const allowed=(DOC_TYPES[refType]||[]).map(x=>x[0]);
@@ -146,6 +149,7 @@ function requiredDocs(rt,rec){
   if(rt==="payment"||rt==="extra") return rec.paidDate?["invoice","report","slip"]:["invoice","report"];
   if(rt==="rfa"){ if(!rec.submitDate) return [];
     return ["อนุมัติแล้ว","อนุมัติตามหมายเหตุ","ไม่อนุมัติ","ให้แก้ไข/ยื่นใหม่"].includes(rec.status)?["form","result"]:["form"]; }
+  if(rt==="contract") return ["contract"];
   if(rt==="eot") return rec.decisionDate?["letter","result"]:["letter"];
   return [];
 }
@@ -254,6 +258,8 @@ function viewDash(){
     gaps.push({rt:"extra",id:x.id,title:"งานเพิ่ม · "+x.building,miss:missingLabel("extra",x)});});
   S.eots.forEach(e=>{const m=docState("eot",e).missing; if(m.length)
     gaps.push({rt:"eot",id:e.id,title:"ขยายเวลาครั้งที่ "+e.no+" ("+e.docNo+")",miss:missingLabel("eot",e)});});
+  S.contracts.forEach(c=>{const m=docState("contract",c).missing; if(m.length)
+    gaps.push({rt:"contract",id:c.id,title:"สัญญา · "+c.code,miss:missingLabel("contract",c)});});
   S.rfas.forEach(r=>{const m=docState("rfa",r).missing; if(m.length)
     gaps.push({rt:"rfa",id:r.id,title:"ขออนุมัติ · "+(r.title||""),miss:missingLabel("rfa",r)});});
 
@@ -572,6 +578,7 @@ function viewDocs(){
     if(f.refType==="payment"){ const p=S.payments.find(x=>x.id===f.refId); const c=p&&S.contracts.find(c=>c.id===p.contractId);
       return p?((c?c.code+" · ":"")+"งวดที่ "+p.seq+" ("+(p.invoice||"—")+")"):"งวดงานที่ถูกลบ"; }
     if(f.refType==="extra"){ const x=S.extras.find(x=>x.id===f.refId); return x?("งานเพิ่ม · "+x.building):"งานเพิ่มที่ถูกลบ"; }
+    if(f.refType==="contract"){ const c=S.contracts.find(x=>x.id===f.refId); return c?("สัญญา · "+c.code):"สัญญาที่ถูกลบ"; }
     if(f.refType==="rfa"){ const r=S.rfas.find(x=>x.id===f.refId); return r?("ขออนุมัติ · "+(r.trade||r.title)+(r.docNo?" ("+r.docNo+")":"")):"รายการขออนุมัติที่ถูกลบ"; }
     if(f.refType==="eot"){ const e=S.eots.find(x=>x.id===f.refId); return e?("ขอขยายเวลาครั้งที่ "+e.no+" · "+e.docNo):"คำขอที่ถูกลบ"; }
     return "โครงการ";
@@ -608,6 +615,9 @@ function viewSetup(){
       '<div class="muted" style="font-size:12px;margin-top:6px">เบิกแล้ว '+money(s.billed)+' บาท · คงเหลือ '+money(s.rest)+' บาท</div>'+
       (c.endDate?'<div style="font-size:12.5px;margin-top:8px">กำหนดแล้วเสร็จตามสัญญา <b class="num">'+thDateFull(c.endDate)+'</b></div>':'')+
       '<div style="font-size:12px;color:var(--ink-3);margin-top:8px;line-height:1.5">'+esc(c.bank||"")+'</div>'+
+      '<div class="ctr-docs">'+docChip("contract",c)+
+      '<button class="clip" data-files="contract:'+c.id+'">เอกสารสัญญา'+
+      (filesFor("contract",c.id).length?' · '+filesFor("contract",c.id).length+' ไฟล์':' — ยังไม่มี')+'</button></div>'+
       '</div></div>';
     }).join("")+'</div>';
 }
@@ -717,13 +727,15 @@ function editContract(id){
 
 /* ---------- attachment drawer ---------- */
 function refRecord(rt,id){
-  return (rt==="payment"?S.payments:rt==="extra"?S.extras:rt==="rfa"?S.rfas:S.eots).find(r=>r.id===id)||{id};
+  return (rt==="payment"?S.payments:rt==="extra"?S.extras:rt==="rfa"?S.rfas:
+          rt==="contract"?S.contracts:S.eots).find(r=>r.id===id)||{id};
 }
 function openFiles(refType,refId){
   const rec=refRecord(refType,refId);
   const title = refType==="payment"?"เอกสารแนบของงวดงาน":refType==="extra"?"เอกสารแนบของงานเพิ่ม":
-    refType==="rfa"?"เอกสารแนบของรายการขออนุมัติ":"เอกสารแนบของคำขอขยายเวลา";
-  const sub = refType==="payment"? (esc(rec.invoice||"")+" · งวดที่ "+(rec.seq||"—")) :
+    refType==="rfa"?"เอกสารแนบของรายการขออนุมัติ":refType==="contract"?"เอกสารของสัญญา":"เอกสารแนบของคำขอขยายเวลา";
+  const sub = refType==="contract"? (esc(rec.code||"")+" · "+esc(rec.contractor||"")) :
+              refType==="payment"? (esc(rec.invoice||"")+" · งวดที่ "+(rec.seq||"—")) :
               refType==="rfa"? esc(rec.title||"") : refType==="eot"? ("ครั้งที่ "+(rec.no||"")+" · "+esc(rec.docNo||"")) :
               esc(rec.building||"");
   const fileRow = f=>'<div class="filerow"><div class="ic">'+esc((f.name.split(".").pop()||"?").slice(0,4).toUpperCase())+'</div>'+
