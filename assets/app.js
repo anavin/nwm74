@@ -298,18 +298,18 @@ function viewDash(){
       const late=(r.age||0)>30;
       return '<tr><td data-l="รายการ" class="stripe '+(late?"late":"due")+'" style="min-width:200px">'+
         '<div style="font-weight:600">'+esc(r.who)+' · '+esc(r.what)+'</div>'+
-        '<div class="muted" style="font-size:11.5px">'+esc((r.rec.detail||"").slice(0,70))+'</div></td>'+
+        '<div class="muted" style="font-size:13px">'+esc((r.rec.detail||"").slice(0,70))+'</div></td>'+
         '<td data-l="เลขที่ใบเบิก" class="num">'+esc(r.invoice||"—")+'</td>'+
         '<td data-l="ยื่นเมื่อ" class="num">'+thDate(r.date)+'</td>'+
         '<td data-l="อายุหนี้" style="min-width:130px"><div class="agewrap"><span class="agebar'+(late?" late":"")+'">'+
           '<i style="width:'+Math.min(100,Math.round((r.age||0)/maxAge*100))+'%"></i></span>'+
           '<b class="num'+(late?" agelate":"")+'">'+(r.age==null?"—":r.age+" วัน")+'</b></div></td>'+
-        '<td data-l="ยอดที่ต้องโอน" class="r num" style="font-weight:600;font-size:14px">'+money(r.amount)+'</td>'+
+        '<td data-l="ยอดที่ต้องโอน" class="r num" style="font-weight:600;font-size:16px">'+money(r.amount)+'</td>'+
         '<td data-l="เอกสาร" class="c"><div>'+docChip(r.rt,r.rec)+'</div></td>'+
         '<td><div class="rowacts"><button class="btn ghost sm" data-edit="'+(r.rt==="payment"?"pay":"extra")+':'+r.rec.id+'">บันทึกการโอน</button></div></td></tr>';
     }).join("")+
     '</tbody><tfoot><tr><td colspan="4" class="r" style="font-weight:600">รวมค้างจ่าย</td>'+
-    '<td class="r num" style="font-weight:700;font-size:15px">'+money(dueTotal)+'</td><td colspan="2"></td></tr></tfoot></table>'
+    '<td class="r num" style="font-weight:700;font-size:17px">'+money(dueTotal)+'</td><td colspan="2"></td></tr></tfoot></table>'
    :'<div class="empty">ไม่มีรายการค้างจ่าย — จ่ายครบทุกงวดแล้ว</div>')+
   '</div></div>'+
 
@@ -369,7 +369,7 @@ function viewDash(){
       (gaps.length? gaps.slice(0,7).map(g=>
         '<div class="tk"><button class="clip" data-files="'+g.rt+':'+g.id+'">แนบ</button>'+
         '<div><div class="tk-t">'+esc(g.title)+'</div><div class="tk-s">ขาด: '+esc(g.miss)+'</div></div></div>').join("")+
-        (gaps.length>7?'<div class="muted" style="font-size:12px">และอีก '+(gaps.length-7)+' รายการ</div>':'')
+        (gaps.length>7?'<div class="muted" style="font-size:13.5px">และอีก '+(gaps.length-7)+' รายการ</div>':'')
        : '<div class="muted">เอกสารครบทุกรายการ</div>')+
       '</div></div>'+
     '</div>'+
@@ -427,7 +427,7 @@ function viewPay(){
       rows.map(p=>{
         const st=pstatus(p), age=daysBetween(p.reqDate), n=filesFor("payment",p.id).length;
         return '<tr><td data-l="งวดที่" class="c stripe '+st+' num">'+p.seq+'</td>'+
-          '<td data-l="รายละเอียดงาน" style="min-width:250px">'+esc(p.detail)+(p.note?'<div class="muted" style="font-size:11.5px">'+esc(p.note)+'</div>':'')+'</td>'+
+          '<td data-l="รายละเอียดงาน" style="min-width:250px">'+esc(p.detail)+(p.note?'<div class="muted" style="font-size:13px">'+esc(p.note)+'</div>':'')+'</td>'+
           '<td data-l="มูลค่างวด" class="r num">'+money(p.amount)+'</td><td data-l="VAT" class="r num">'+(p.vat?money(p.vat):'<span class="muted">—</span>')+'</td>'+
           '<td data-l="หักประกัน" class="r num">'+(p.retention?money(p.retention):'<span class="muted">—</span>')+'</td>'+
           '<td data-l="ยอดจ่ายจริง" class="r num" style="font-weight:600">'+money(paidNet(p))+'</td>'+
@@ -461,7 +461,7 @@ function viewExtra(){
     (S.extras.length?S.extras.map(x=>{
       const st=pstatus(x), n=filesFor("extra",x.id).length;
       return '<tr><td data-l="อาคาร" class="stripe '+st+'">'+esc(x.building)+'</td>'+
-        '<td data-l="รายละเอียดงาน" style="min-width:260px">'+esc(x.detail)+(x.note?'<div class="muted" style="font-size:11.5px">'+esc(x.note)+'</div>':'')+'</td>'+
+        '<td data-l="รายละเอียดงาน" style="min-width:260px">'+esc(x.detail)+(x.note?'<div class="muted" style="font-size:13px">'+esc(x.note)+'</div>':'')+'</td>'+
         '<td data-l="มูลค่างาน" class="r num">'+money(x.amount)+'</td><td data-l="ส่วนลด" class="r num">'+(x.discount?money(x.discount):'<span class="muted">—</span>')+'</td>'+
         '<td data-l="ยอดจ่ายจริง" class="r num" style="font-weight:600">'+money(paidNet(x))+'</td>'+
         '<td data-l="เลขที่ใบเบิก" class="num">'+esc(x.invoice||"—")+'</td><td data-l="วันที่เบิก" class="num">'+thDate(x.reqDate)+'</td>'+
@@ -517,25 +517,25 @@ function viewRfa(){
     const lateDl = dl && dl<today && st!=="paid";
     return '<tr><td data-l="หมวดงาน" class="stripe '+(st==="idle"?"":st)+'" style="min-width:230px">'+
       '<div style="font-weight:600">'+esc(r.title||"—")+'</div>'+
-      '<div class="muted" style="font-size:12px">'+esc(r.detail||"")+'</div>'+
-      (r.note?'<div class="muted" style="font-size:11.5px">'+esc(r.note)+'</div>':'')+'</td>'+
-      '<td data-l="ประเภท" style="font-size:12px">'+esc(r.category||"—")+'</td>'+
+      '<div class="muted" style="font-size:13.5px">'+esc(r.detail||"")+'</div>'+
+      (r.note?'<div class="muted" style="font-size:13px">'+esc(r.note)+'</div>':'')+'</td>'+
+      '<td data-l="ประเภท" style="font-size:13.5px">'+esc(r.category||"—")+'</td>'+
       '<td data-l="เลขที่เอกสาร" class="num">'+esc(r.docNo||"—")+'</td>'+
-      '<td data-l="ยี่ห้อ / รุ่น" style="font-size:12.5px">'+(r.brand?esc(r.brand):'<span class="muted">—</span>')+'</td>'+
-      '<td data-l="ผู้พิจารณา" style="font-size:12.5px">'+esc(r.reviewer||"—")+'</td>'+
+      '<td data-l="ยี่ห้อ / รุ่น" style="font-size:14px">'+(r.brand?esc(r.brand):'<span class="muted">—</span>')+'</td>'+
+      '<td data-l="ผู้พิจารณา" style="font-size:14px">'+esc(r.reviewer||"—")+'</td>'+
       '<td data-l="Lead time" class="c num">'+(r.leadDays?r.leadDays+" วัน":'<span class="muted">—</span>')+'</td>'+
       '<td data-l="ต้องใช้งาน" class="num">'+(r.requiredOn?thDate(r.requiredOn):'<span class="muted">—</span>')+'</td>'+
       '<td data-l="ต้องอนุมัติภายใน" class="num" style="font-weight:600'+(lateDl?";color:var(--late)":"")+'">'+(dl?thDate(dl):'<span class="muted">—</span>')+'</td>'+
       '<td data-l="วันที่ยื่น" class="num">'+(r.submitDate?thDate(r.submitDate):'<span class="muted">—</span>')+'</td>'+
       '<td data-l="ครบกำหนดตอบ" class="num">'+(r.dueDate?thDate(r.dueDate):'<span class="muted">—</span>')+'</td>'+
       '<td data-l="สถานะ" class="c"><span class="pill '+(st==="idle"?"info":st)+'">'+esc(r.status||"—")+'</span>'+
-        (r.decisionDate?'<div class="muted num" style="font-size:11px">'+thDate(r.decisionDate)+'</div>':'')+'</td>'+
+        (r.decisionDate?'<div class="muted num" style="font-size:12.5px">'+thDate(r.decisionDate)+'</div>':'')+'</td>'+
       '<td data-l="เอกสาร" class="c"><div>'+docChip("rfa",r)+'</div></td>'+
       '<td><div class="rowacts"><button class="btn ghost sm" data-edit="rfa:'+r.id+'">แก้ไข</button>'+
       '<button class="btn ghost sm" data-del="rfa:'+r.id+'">ลบ</button></div></td></tr>';
   }).join("") : '<tr><td colspan="13"><div class="empty">ไม่พบรายการตามเงื่อนไขที่เลือก</div></td></tr>')+
   '</tbody></table></div></div>'+
-  '<div class="card" style="margin-top:14px"><div class="card-b muted" style="font-size:12.5px;line-height:1.6">'+
+  '<div class="card" style="margin-top:14px"><div class="card-b muted" style="font-size:14px;line-height:1.6">'+
   'รายการตั้งต้นเป็นโครงหมวดงานที่ต้องขออนุมัติตามลำดับงาน — เติมเลขที่เอกสาร RFA ยี่ห้อ/รุ่น วันที่ยื่น และวันที่ต้องใช้งานหน้างานได้เอง '+
   'ระบบจะคำนวณวันสุดท้ายที่ต้องได้รับอนุมัติจาก lead time ให้อัตโนมัติ และขึ้นเตือนในหน้าภาพรวมเมื่อใกล้หรือเลยกำหนด'+
   '</div></div>';
@@ -550,12 +550,12 @@ function viewEot(){
     acc+=Number(e.days||0);
     const n=filesFor("eot",e.id).length, ok=e.status==="อนุมัติแล้ว";
     return '<tr><td data-l="ครั้งที่" class="c stripe '+(ok?"paid":"due")+' num" style="font-weight:600">'+e.no+'</td>'+
-      '<td data-l="เหตุผล / สาเหตุ" style="min-width:300px">'+esc(e.reason)+(e.note?'<div class="muted" style="font-size:11.5px">'+esc(e.note)+'</div>':'')+'</td>'+
+      '<td data-l="เหตุผล / สาเหตุ" style="min-width:300px">'+esc(e.reason)+(e.note?'<div class="muted" style="font-size:13px">'+esc(e.note)+'</div>':'')+'</td>'+
       '<td data-l="เลขที่เอกสาร" class="num">'+esc(e.docNo)+'</td><td data-l="วันที่ยื่น" class="num">'+thDate(e.submitDate)+'</td>'+
       '<td data-l="ขอขยาย (วัน)" class="c num" style="font-weight:600">'+e.days+'</td><td data-l="รวมสะสม" class="c num">'+acc+'</td>'+
       '<td data-l="สิ้นสุดเดิม" class="num">'+thDate(e.oldEnd)+'</td><td data-l="สิ้นสุดใหม่" class="num" style="font-weight:600">'+thDate(e.newEnd)+'</td>'+
       '<td data-l="สถานะ" class="c"><span class="pill '+(ok?"paid":"due")+'">'+esc(e.status)+'</span>'+
-        (e.decisionDate?'<div class="muted num" style="font-size:11px">'+thDate(e.decisionDate)+'</div>':'')+'</td>'+
+        (e.decisionDate?'<div class="muted num" style="font-size:12.5px">'+thDate(e.decisionDate)+'</div>':'')+'</td>'+
       '<td data-l="เอกสาร" class="c"><div>'+docChip("eot",e)+'</div></td>'+
       '<td><div class="rowacts"><button class="btn ghost sm" data-edit="eot:'+e.id+'">แก้ไข</button>'+
       '<button class="btn ghost sm" data-del="eot:'+e.id+'">ลบ</button></div></td></tr>';
@@ -606,15 +606,15 @@ function viewSetup(){
       return '<div class="card"><div class="card-h"><h3>'+esc(c.code)+'</h3>'+
       '<button class="btn ghost sm" data-edit="contract:'+c.id+'">แก้ไข</button></div><div class="card-b">'+
       '<div style="font-weight:600">'+esc(c.name)+'</div>'+
-      '<div class="muted" style="font-size:12.5px;margin-bottom:10px">'+esc(c.contractor)+'</div>'+
+      '<div class="muted" style="font-size:14px;margin-bottom:10px">'+esc(c.contractor)+'</div>'+
       '<div class="ctr-figs" style="margin:0 0 10px"><span>มูลค่าสัญญา <b>'+money(c.amount)+'</b></span>'+
       '<span>จำนวนงวด <b>'+(c.periods||"—")+'</b></span>'+
       '<span>VAT <b>'+(c.vat?c.vat+"%":"ไม่มี")+'</b></span>'+
       '<span>หักประกัน <b>'+(c.retention?c.retention+"%":"ไม่มี")+'</b></span></div>'+
       '<div class="bar"><span style="width:'+Math.min(100,s.billed/Math.max(1,c.amount)*100)+'%"></span></div>'+
-      '<div class="muted" style="font-size:12px;margin-top:6px">เบิกแล้ว '+money(s.billed)+' บาท · คงเหลือ '+money(s.rest)+' บาท</div>'+
-      (c.endDate?'<div style="font-size:12.5px;margin-top:8px">กำหนดแล้วเสร็จตามสัญญา <b class="num">'+thDateFull(c.endDate)+'</b></div>':'')+
-      '<div style="font-size:12px;color:var(--ink-3);margin-top:8px;line-height:1.5">'+esc(c.bank||"")+'</div>'+
+      '<div class="muted" style="font-size:13.5px;margin-top:6px">เบิกแล้ว '+money(s.billed)+' บาท · คงเหลือ '+money(s.rest)+' บาท</div>'+
+      (c.endDate?'<div style="font-size:14px;margin-top:8px">กำหนดแล้วเสร็จตามสัญญา <b class="num">'+thDateFull(c.endDate)+'</b></div>':'')+
+      '<div style="font-size:13.5px;color:var(--ink-3);margin-top:8px;line-height:1.5">'+esc(c.bank||"")+'</div>'+
       '<div class="ctr-docs">'+docChip("contract",c)+
       '<button class="clip" data-files="contract:'+c.id+'">เอกสารสัญญา'+
       (filesFor("contract",c.id).length?' · '+filesFor("contract",c.id).length+' ไฟล์':' — ยังไม่มี')+'</button></div>'+
@@ -765,7 +765,7 @@ function openFiles(refType,refId){
 
   $("#overlay").innerHTML='<div class="scrim" data-close="1" style="padding:0;align-items:stretch;justify-content:flex-end">'+
     '<div class="drawer" role="dialog" aria-modal="true">'+
-    '<div class="card-h"><div><h3>'+esc(title)+'</h3><div class="muted" style="font-size:11.5px">'+sub+'</div></div>'+
+    '<div class="card-h"><div><h3>'+esc(title)+'</h3><div class="muted" style="font-size:13px">'+sub+'</div></div>'+
     '<button class="btn ghost sm" data-close="1">ปิด</button></div>'+
     '<div class="card-b" style="display:grid;gap:12px;align-content:start">'+
       '<div class="drop" id="drop">ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือก<br>'+
@@ -891,7 +891,7 @@ function showLogin(){
     '<form class="card-b" id="loginform" onsubmit="return false">'+
       '<div class="f-row"><label for="lg_email">อีเมล</label><input id="lg_email" type="email" autocomplete="username" required></div>'+
       '<div class="f-row"><label for="lg_pw">รหัสผ่าน</label><input id="lg_pw" type="password" autocomplete="current-password" required></div>'+
-      '<div id="lg_err" class="muted" style="font-size:12px;color:var(--late)"></div>'+
+      '<div id="lg_err" class="muted" style="font-size:13.5px;color:var(--late)"></div>'+
     '</form>'+
     '<div class="foot"><button class="btn primary" id="lg_go">เข้าสู่ระบบ</button></div></div></div>';
   const go=async()=>{
