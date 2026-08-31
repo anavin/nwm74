@@ -697,8 +697,10 @@ async function runImport(){
   for(let i=0;i<rows.length;i++){
     const r=rows[i];
     if(msg) msg.textContent="กำลังอัปโหลด "+(i+1)+"/"+rows.length+" — "+r.file.name;
-    try{ await Store.uploadFile(r.file, r.rt, r.id, r.dt); r.done=true; }
-    catch(e){ r.err=(e.message||String(e)).slice(0,40); }
+    const dup=S.files.some(f=>f.refType===r.rt&&f.refId===r.id&&f.name===r.file.name);
+    if(dup){ r.done=true; r.err=""; continue; }
+    try{ await Store.uploadFile(r.file, r.rt, r.id, r.dt); r.done=true; r.err=""; }
+    catch(e){ r.err=(e.message||String(e)).slice(0,60); }
   }
   await refresh();
   const ok=(S.imp||[]).filter(r=>r.done).length;

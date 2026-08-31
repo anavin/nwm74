@@ -114,9 +114,20 @@ const Store = (() => {
   }
 
   /* ---------------- storage ---------------- */
-  const slug = s => (s || "file").normalize("NFC").replace(/[^\w.\-ก-๙]+/g, "_").slice(-80);
+  /* Supabase Storage รับเฉพาะคีย์แบบ ASCII — ชื่อไฟล์ไทยต้องแปลงก่อน
+     (ชื่อจริงยังเก็บครบในคอลัมน์ name เพื่อแสดงผล) */
+  const slug = s => {
+    const src = String(s || "file");
+    const m = /\.([A-Za-z0-9]{1,8})$/.exec(src);
+    const ext = m ? "." + m[1].toLowerCase() : "";
+    const base = src.replace(/\.[^.]*$/, "")
+      .replace(/[^A-Za-z0-9._-]+/g, "-")
+      .replace(/-+/g, "-").replace(/^[-.]+|[-.]+$/g, "")
+      .slice(0, 48);
+    return (base || "file") + ext;
+  };
   async function uploadFile(file, refType, refId, docType){
-    const path = `${refType}/${refId}/${docType || "other"}-${Date.now()}-${slug(file.name)}`;
+    const path = `${refType}/${refId}/${docType || "other"}-${Date.now()}-${Math.random().toString(36).slice(2,7)}-${slug(file.name)}`;
     const up = await sb.storage.from(BUCKET).upload(path, file, {contentType: file.type || undefined, upsert: false});
     if(up.error) throw up.error;
     const {error} = await sb.from("files").insert({
