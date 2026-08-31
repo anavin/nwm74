@@ -1,15 +1,15 @@
 :root{
-  --ground:#EFF5FF; --surface:#FFFFFF; --surface-2:#EAF2FE; --sunken:#DCE8F8;
-  --ink:#111A28; --ink-2:#4A5A70; --ink-3:#7B8AA0;
-  --line:#D8E4F5; --line-strong:#B9CCE8;
-  --accent:#1B6FE8; --accent-soft:#DDEBFF; --accent-ink:#0B54BD;
-  --brass:#D08C00; --brass-soft:#FFF3D2; --brass-line:#FFD777;
-  --rail:#12379E; --rail-a:#153FB4; --rail-b:#0A78B0; --rail-ink:#FFFFFF; --rail-ink-2:#BFD9F5;
+  --ground:#F6F7F9; --surface:#FFFFFF; --surface-2:#F1F3F6; --sunken:#E5E8EC;
+  --ink:#0F172A; --ink-2:#475569; --ink-3:#8B95A5;
+  --line:#E4E7EC; --line-strong:#CBD1DA;
+  --accent:#0F766E; --accent-soft:#E2F3F1; --accent-ink:#0B5D57;
+  --brass:#92700F; --brass-soft:#F7F1DE; --brass-line:#D9C384;
+  --rail:#111827; --rail-a:#0F172A; --rail-b:#1F2937; --rail-ink:#FFFFFF; --rail-ink-2:#9AA5B4;
   --rail-line:rgba(255,255,255,.18); --rail-active:rgba(255,255,255,.16);
-  --hero-a:#12379E; --hero-b:#0C7FA8; --hero-fig:#FFCE3D;
-  --paid:#008F5D; --due:#D97400; --late:#E5342A;
-  --fill-paid:#12B76A; --fill-due:#FF9500; --unbilled:#C6D6EC;
-  --paid-soft:#D7F7EA; --due-soft:#FFF0D6; --late-soft:#FFE5E2;
+  --hero-a:#0F172A; --hero-b:#134E4A; --hero-fig:#F5C451;
+  --paid:#047857; --due:#B45309; --late:#B42318;
+  --fill-paid:#0E9F6E; --fill-due:#E8A33D; --unbilled:#D2D7DE;
+  --paid-soft:#E4F5EE; --due-soft:#FBF1E1; --late-soft:#FCEBE9;
   --radius:8px; --radius-sm:5px;
   --shadow:0 1px 2px rgba(17,26,40,.05);
   --shadow-lift:0 24px 60px -28px rgba(15,27,51,.5);
@@ -17,34 +17,34 @@
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
-    --ground:#0B111C; --surface:#131C2B; --surface-2:#192436; --sunken:#1F2C42;
-    --ink:#EAF0FA; --ink-2:#AFBFD6; --ink-3:#7C8CA6;
-    --line:#243147; --line-strong:#33435E;
-    --accent:#6FACFF; --accent-soft:#152541; --accent-ink:#8FBAFF;
-    --brass:#F0C264; --brass-soft:#241D0F; --brass-line:#4E3F1C;
-    --rail:#0B1F63; --rail-a:#0C2570; --rail-b:#064A6E; --rail-ink:#F2F7FF; --rail-ink-2:#9FBEE2;
+    --ground:#0B0F14; --surface:#141A21; --surface-2:#1A222B; --sunken:#222B35;
+    --ink:#E9EDF2; --ink-2:#AAB6C3; --ink-3:#7A8695;
+    --line:#242D38; --line-strong:#33404E;
+    --accent:#48C5B5; --accent-soft:#10302C; --accent-ink:#79DCCB;
+    --brass:#D8B45F; --brass-soft:#211C10; --brass-line:#4B3F20;
+    --rail:#080B0F; --rail-a:#0B1016; --rail-b:#16202A; --rail-ink:#F2F5F9; --rail-ink-2:#8A97A6;
     --rail-line:rgba(255,255,255,.14); --rail-active:rgba(255,255,255,.13);
-    --hero-a:#122C7A; --hero-b:#0A5F80; --hero-fig:#FFCA61;
-    --paid:#48DDA4; --due:#FFB84D; --late:#FF7A6D;
-    --fill-paid:#22B784; --fill-due:#E8961F; --unbilled:#31405A;
-    --paid-soft:#0F2A22; --due-soft:#2A2113; --late-soft:#2E1817;
+    --hero-a:#0C1218; --hero-b:#123F3B; --hero-fig:#F2C75C;
+    --paid:#3BC79A; --due:#E0A64B; --late:#F0776B;
+    --fill-paid:#1FA57A; --fill-due:#D2913A; --unbilled:#2C3742;
+    --paid-soft:#10241E; --due-soft:#241D12; --late-soft:#2A1917;
     --shadow:0 1px 2px rgba(0,0,0,.35);
     --shadow-lift:0 28px 70px -30px rgba(0,0,0,.85);
     color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
-  --ground:#0B111C; --surface:#131C2B; --surface-2:#192436; --sunken:#1F2C42;
-    --ink:#EAF0FA; --ink-2:#AFBFD6; --ink-3:#7C8CA6;
-    --line:#243147; --line-strong:#33435E;
-    --accent:#6FACFF; --accent-soft:#152541; --accent-ink:#8FBAFF;
-    --brass:#F0C264; --brass-soft:#241D0F; --brass-line:#4E3F1C;
-    --rail:#0B1F63; --rail-a:#0C2570; --rail-b:#064A6E; --rail-ink:#F2F7FF; --rail-ink-2:#9FBEE2;
+  --ground:#0B0F14; --surface:#141A21; --surface-2:#1A222B; --sunken:#222B35;
+    --ink:#E9EDF2; --ink-2:#AAB6C3; --ink-3:#7A8695;
+    --line:#242D38; --line-strong:#33404E;
+    --accent:#48C5B5; --accent-soft:#10302C; --accent-ink:#79DCCB;
+    --brass:#D8B45F; --brass-soft:#211C10; --brass-line:#4B3F20;
+    --rail:#080B0F; --rail-a:#0B1016; --rail-b:#16202A; --rail-ink:#F2F5F9; --rail-ink-2:#8A97A6;
     --rail-line:rgba(255,255,255,.14); --rail-active:rgba(255,255,255,.13);
-    --hero-a:#122C7A; --hero-b:#0A5F80; --hero-fig:#FFCA61;
-    --paid:#48DDA4; --due:#FFB84D; --late:#FF7A6D;
-    --fill-paid:#22B784; --fill-due:#E8961F; --unbilled:#31405A;
-    --paid-soft:#0F2A22; --due-soft:#2A2113; --late-soft:#2E1817;
+    --hero-a:#0C1218; --hero-b:#123F3B; --hero-fig:#F2C75C;
+    --paid:#3BC79A; --due:#E0A64B; --late:#F0776B;
+    --fill-paid:#1FA57A; --fill-due:#D2913A; --unbilled:#2C3742;
+    --paid-soft:#10241E; --due-soft:#241D12; --late-soft:#2A1917;
     --shadow:0 1px 2px rgba(0,0,0,.35);
     --shadow-lift:0 28px 70px -30px rgba(0,0,0,.85);
     color-scheme:dark;
@@ -109,7 +109,7 @@ a{color:var(--accent-ink)}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
 .card-h{display:flex;align-items:baseline;justify-content:space-between;gap:14px;
   padding:15px 18px;border-bottom:1px solid var(--line);position:relative}
-.card-h:before{content:"";position:absolute;left:18px;bottom:-1px;width:34px;height:2px;background:var(--accent);border-radius:2px;opacity:.75}
+.card-h:before{content:"";position:absolute;left:18px;bottom:-1px;width:30px;height:2px;background:var(--accent);border-radius:2px;opacity:.55}
 .card-h h3{font-size:17px}
 .card-h .hint{font-size:13px;color:var(--ink-3);text-align:right}
 .card-b{padding:18px}
@@ -124,7 +124,7 @@ a{color:var(--accent-ink)}
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kpi .val small{font-size:13.5px;font-weight:400;color:var(--ink-3);margin-left:5px;letter-spacing:0}
 .kpi .note{font-size:13px;color:var(--ink-3);margin-top:7px;line-height:1.5}
-.kpi.lead{background:linear-gradient(180deg,var(--accent-soft),var(--surface) 70%)}
+.kpi.lead{background:var(--surface);box-shadow:inset 0 2px 0 var(--accent)}
 .kpi.lead .val{color:var(--accent-ink)}
 .kpi.lead .lab{color:var(--brass)}
 .kpi.warn .val{color:var(--due)}
@@ -133,8 +133,8 @@ a{color:var(--accent-ink)}
 /* ---------- meters ---------- */
 .meter{display:flex;height:8px;border-radius:2px;overflow:hidden;background:var(--sunken);gap:2px}
 .meter span{display:block;height:100%}
-.meter .s-paid{background:linear-gradient(90deg,var(--fill-paid),#2BD48A)}
-.meter .s-due{background:linear-gradient(90deg,var(--fill-due),#FFB43D)}
+.meter .s-paid{background:var(--fill-paid)}
+.meter .s-due{background:var(--fill-due)}
 .meter .s-un{background:var(--unbilled)}
 .legend{display:flex;flex-wrap:wrap;gap:16px;font-size:13px;color:var(--ink-3);margin-top:14px;
   padding-top:12px;border-top:1px solid var(--line)}
@@ -262,15 +262,15 @@ td.c,th.c{text-align:center}
 .hs-row{display:grid;grid-template-columns:88px 1fr auto;align-items:center;gap:12px;font-size:13.5px}
 .hs-nm{color:#BDD2E8}
 .hs-bar{height:6px;border-radius:3px;background:rgba(255,255,255,.09);overflow:hidden}
-.hs-bar i{display:block;height:100%;background:linear-gradient(90deg,#FFD34D,#FF8A2B);border-radius:3px}
+.hs-bar i{display:block;height:100%;background:var(--fill-due);border-radius:3px}
 .hs-val{font-size:14px;font-weight:600;color:#FFFFFF}
 .hs-foot{margin-top:6px;padding-top:11px;border-top:1px solid rgba(255,255,255,.15);font-size:13px;color:#B7CBE2}
 
 /* ---------- อายุหนี้ ---------- */
 .agewrap{display:flex;align-items:center;gap:9px}
 .agebar{flex:1;height:5px;border-radius:3px;background:var(--sunken);overflow:hidden;min-width:46px}
-.agebar i{display:block;height:100%;background:linear-gradient(90deg,var(--fill-due),#FFB43D);border-radius:3px}
-.agebar.late i{background:linear-gradient(90deg,var(--late),#FF7A5C)}
+.agebar i{display:block;height:100%;background:var(--fill-due);border-radius:3px}
+.agebar.late i{background:var(--late)}
 .agelate{color:var(--late)}
 
 /* ---------- ตัวบ่งชี้เอกสาร ---------- */
