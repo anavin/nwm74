@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>ศูนย์ควบคุมงานมหาวิหารเก้าฟ้า</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+Thai:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="./assets/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏗️</text></svg>">
+<style>body.locked .shell{filter:blur(3px);pointer-events:none;user-select:none}</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="rail">
+    <div class="brand">
+      <div class="mark">NM74 · APRFA</div>
+      <h1>มหาวิหารเก้าฟ้า</h1>
+      <p>ซอยนวมินทร์ 74 แยก 5 · เขตบึงกุ่ม กรุงเทพฯ</p>
+    </div>
+    <div id="nav"></div>
+    <div class="railfoot">
+      <div id="dbstate">กำลังเชื่อมต่อฐานข้อมูล…</div>
+      <button class="btn ghost sm" id="themeBtn" style="margin-top:8px">สลับธีมสว่าง/มืด</button>
+      <button class="btn ghost sm" id="logoutBtn" style="margin-top:6px">ออกจากระบบ</button>
+    </div>
+  </nav>
+  <main class="main">
+    <div id="banner"></div>
+    <div class="topbar">
+      <div>
+        <h2 id="viewTitle">ภาพรวมโครงการ</h2>
+        <div class="sub" id="viewSub"></div>
+      </div>
+      <div class="toolbar" id="viewTools"></div>
+    </div>
+    <div id="view"></div>
+  </main>
+</div>
+<div id="overlay"></div>
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="./config.js"></script>
+<script src="./assets/store.js"></script>
+<script src="./assets/app.js"></script>
+</body>
+</html>
