@@ -11,7 +11,7 @@ const BUCKET = "nm74-files";
 /* ---- แปลงชื่อฟิลด์ ระหว่าง JS (camelCase) กับ Postgres (snake_case) ---- */
 const MAPS = {
   contracts: {order:"ord", code:"code", name:"name", contractor:"contractor", amount:"amount",
-    periods:"periods", vat:"vat", retention:"retention", endDate:"end_date", bank:"bank"},
+    periods:"periods", vat:"vat", retention:"retention", endDate:"end_date", dueDay:"due_day", bank:"bank"},
   payments: {contractId:"contract_id", seq:"seq", detail:"detail", amount:"amount", vat:"vat",
     retention:"retention", invoice:"invoice", reqDate:"req_date", paidDate:"paid_date", note:"note"},
   extras: {building:"building", detail:"detail", amount:"amount", discount:"discount",

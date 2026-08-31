@@ -18,6 +18,7 @@ create table if not exists nm74.contracts (
   vat         numeric(5,2)  default 0,
   retention   numeric(5,2)  default 0,
   end_date    date,
+  due_day     int,                            -- วันครบกำหนดจ่ายประจำเดือน (เช่น 19)
   bank        text,
   created_at  timestamptz default now(),
   updated_at  timestamptz default now()
@@ -167,6 +168,7 @@ insert into nm74.contracts (id,ord,code,name,contractor,amount,periods,vat,reten
   ('c2',2,'อาคาร 3 ชั้น','มหาวิหารเก้าฟ้า (อาคารพักอาศัย)','บริษัท เอ พลัส แอสโซซิเอท จำกัด',23005000,15,7,5,'2027-04-15','กสิกรไทย สาขายูเนียนมอลล์ ลาดพร้าว · 763-2-09297-5 · บริษัท เอ พลัส แอสโซซิเอท จำกัด'),
   ('c3',3,'CM-P92','ที่ปรึกษาและบริหารงานก่อสร้าง','นายพรชัย ชัยโชติวาณิช',1500000,15,0,0,null,'ไทยพาณิชย์ · 234-2-04398-6 · นายพรชัย ชัยโชติวาณิช')
 on conflict (id) do nothing;
+update nm74.contracts set due_day = 19 where code ilike '%CM%';
 
 insert into nm74.payments (id,contract_id,seq,detail,amount,vat,retention,invoice,req_date,paid_date,note) values
   ('p01','c1',1,'เซ็นสัญญา',120000,0,6000,'ใบเบิกงวด 1','2026-02-19','2026-02-20',null),

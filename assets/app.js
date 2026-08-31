@@ -53,12 +53,35 @@ function rfaState(r){
 /* ---------- derived ---------- */
 const paidNet = p => Number(p.amount||0)+Number(p.vat||0)-Number(p.retention||0)-Number(p.discount||0);
 const isPaid = r => !!r.paidDate;
+function contractOf(r){ return S.contracts.find(c=>c.id===r.contractId); }
+/* วันครบกำหนดจ่าย: ถ้าสัญญากำหนด "จ่ายทุกวันที่ N ของเดือน" ให้ใช้วันที่ N ครั้งถัดไปนับจากวันที่ยื่นเบิก */
+function dueDateOf(r){
+  const c=contractOf(r), d=Number(c&&c.dueDay||0);
+  if(!d || !r.reqDate) return "";
+  const t=new Date(r.reqDate+"T00:00:00"); if(isNaN(t)) return "";
+  const mk=(y,m)=>{ const last=new Date(y,m+1,0).getDate(); return new Date(y,m,Math.min(d,last)); };
+  let x=mk(t.getFullYear(),t.getMonth());
+  if(x<t) x=mk(t.getFullYear(),t.getMonth()+1);
+  return x.toISOString().slice(0,10);
+}
+/* จำนวนวันที่เลยกำหนด (บวก = เลยแล้ว, ลบ = ยังไม่ถึงกำหนด) */
+function overdueDays(r){
+  const due=dueDateOf(r);
+  return due ? daysBetween(due) : daysBetween(r.reqDate);
+}
 function pstatus(r){
   if(r.paidDate) return "paid";
+  const due=dueDateOf(r);
+  if(due) return daysBetween(due)>0 ? "late" : "due";
   const age = daysBetween(r.reqDate);
   return (age!=null && age>30) ? "late" : "due";
 }
-const statusLabel = s => s==="paid"?"จ่ายแล้ว":s==="late"?"ค้างเกินกำหนด":"ค้างจ่าย";
+function dueNote(r){
+  const due=dueDateOf(r); if(!due) return "";
+  const n=daysBetween(due);
+  return n>0 ? "เลยกำหนด "+n+" วัน" : n===0 ? "ครบกำหนดวันนี้" : "ครบกำหนด "+thDate(due)+" (อีก "+Math.abs(n)+" วัน)";
+}
+const statusLabel = s => s==="paid"?"จ่ายแล้ว":s==="late"?"เลยกำหนดจ่าย":"ค้างจ่าย";
 function contractStats(c){
   const rows = S.payments.filter(p=>p.contractId===c.id);
   const billed = rows.reduce((s,p)=>s+paidNet(p),0);
@@ -261,15 +284,15 @@ function viewDash(){
   S.payments.filter(p=>!isPaid(p)).forEach(p=>{
     const c=S.contracts.find(c=>c.id===p.contractId);
     dueRows.push({rt:"payment",rec:p,who:c?c.code:"—",what:"งวดที่ "+p.seq,
-      invoice:p.invoice,amount:paidNet(p),date:p.reqDate,age:daysBetween(p.reqDate)});
+      invoice:p.invoice,amount:paidNet(p),date:p.reqDate,due:dueDateOf(p),age:overdueDays(p),late:pstatus(p)==="late"});
   });
   S.extras.filter(x=>!isPaid(x)).forEach(x=>dueRows.push({rt:"extra",rec:x,who:x.building,what:"งานเพิ่ม",
-      invoice:x.invoice,amount:paidNet(x),date:x.reqDate,age:daysBetween(x.reqDate)}));
-  dueRows.sort((a,b)=>(b.age||0)-(a.age||0));
+      invoice:x.invoice,amount:paidNet(x),date:x.reqDate,due:"",age:daysBetween(x.reqDate),late:pstatus(x)==="late"}));
+  dueRows.sort((a,b)=>(b.late?1:0)-(a.late?1:0) || (b.age||0)-(a.age||0));
   const dueTotal=dueRows.reduce((s,r)=>s+r.amount,0);
-  const overdue=dueRows.filter(r=>(r.age||0)>30);
+  const overdue=dueRows.filter(r=>r.late);
   const overdueSum=overdue.reduce((s,r)=>s+r.amount,0);
-  const maxAge=Math.max(45,...dueRows.map(r=>r.age||0));
+  const maxAge=Math.max(30,...dueRows.map(r=>Math.abs(r.age||0)));
 
   /* ---- เอกสารไม่ครบ ---- */
   const gaps=[];
@@ -294,7 +317,7 @@ function viewDash(){
       '<div class="hero-lab">ยอดค้างจ่าย ณ วันนี้</div>'+
       '<div class="hero-fig">'+money(dueTotal)+'<small>บาท</small></div>'+
       '<div class="hero-sub">'+dueRows.length+' รายการที่เบิกแล้วยังไม่ได้โอน'+
-        (overdue.length?' · <b class="warn">เกิน 30 วัน '+overdue.length+' รายการ ('+money(overdueSum)+' บาท)</b>':' · ยังไม่มีรายการเกินกำหนด')+
+        (overdue.length?' · <b class="warn">เลยกำหนดจ่ายแล้ว '+overdue.length+' รายการ ('+money(overdueSum)+' บาท)</b>':' · ยังไม่มีรายการเลยกำหนด')+
       '</div>'+
     '</div>'+
     '<div class="hero-split">'+
@@ -312,24 +335,27 @@ function viewDash(){
 
   /* ============ ตารางค้างจ่ายรายรายการ ============ */
   '<div class="card" style="margin-bottom:16px"><div class="card-h"><h3>รายการค้างจ่าย</h3>'+
-  '<span class="hint">เรียงตามอายุหนี้ · แถบสีแดงคือเกิน 30 วัน</span></div><div class="tablewrap">'+
+  '<span class="hint">เรียงตามความเร่งด่วน · สีแดงคือเลยกำหนดจ่ายแล้ว</span></div><div class="tablewrap">'+
   (dueRows.length?'<table><thead><tr><th>รายการ</th><th>เลขที่ใบเบิก</th><th>ยื่นเมื่อ</th>'+
-    '<th>อายุหนี้</th><th class="r">ยอดที่ต้องโอน</th><th class="c">เอกสาร</th><th></th></tr></thead><tbody>'+
+    '<th>ครบกำหนดจ่าย</th><th>สถานะเวลา</th><th class="r">ยอดที่ต้องโอน</th><th class="c">เอกสาร</th><th></th></tr></thead><tbody>'+
     dueRows.map(r=>{
-      const late=(r.age||0)>30;
+      const late=r.late;
       return '<tr><td data-l="รายการ" class="stripe '+(late?"late":"due")+'" style="min-width:200px">'+
         '<div style="font-weight:600">'+esc(r.who)+' · '+esc(r.what)+'</div>'+
         '<div class="muted" style="font-size:13px">'+esc((r.rec.detail||"").slice(0,70))+'</div></td>'+
         '<td data-l="เลขที่ใบเบิก" class="num">'+esc(r.invoice||"—")+'</td>'+
         '<td data-l="ยื่นเมื่อ" class="num">'+thDate(r.date)+'</td>'+
-        '<td data-l="อายุหนี้" style="min-width:130px"><div class="agewrap"><span class="agebar'+(late?" late":"")+'">'+
-          '<i style="width:'+Math.min(100,Math.round((r.age||0)/maxAge*100))+'%"></i></span>'+
-          '<b class="num'+(late?" agelate":"")+'">'+(r.age==null?"—":r.age+" วัน")+'</b></div></td>'+
+        '<td data-l="ครบกำหนดจ่าย" class="num">'+(r.due?thDate(r.due):'<span class="muted">ตามที่ตกลง</span>')+'</td>'+
+        '<td data-l="สถานะเวลา" style="min-width:150px"><div class="agewrap"><span class="agebar'+(late?" late":"")+'">'+
+          '<i style="width:'+Math.min(100,Math.max(4,Math.round(Math.abs(r.age||0)/maxAge*100)))+'%"></i></span>'+
+          '<b class="num'+(late?" agelate":"")+'">'+(r.age==null?"—":
+            (r.due? (r.age>0?"เลย "+r.age+" วัน":r.age===0?"ครบวันนี้":"อีก "+Math.abs(r.age)+" วัน")
+                  : "ยื่นมา "+r.age+" วัน"))+'</b></div></td>'+
         '<td data-l="ยอดที่ต้องโอน" class="r num" style="font-weight:600;font-size:16px">'+money(r.amount)+'</td>'+
         '<td data-l="เอกสาร" class="c"><div>'+docChip(r.rt,r.rec)+'</div></td>'+
         '<td><div class="rowacts"><button class="btn ghost sm" data-edit="'+(r.rt==="payment"?"pay":"extra")+':'+r.rec.id+'">บันทึกการโอน</button></div></td></tr>';
     }).join("")+
-    '</tbody><tfoot><tr><td colspan="4" class="r" style="font-weight:600">รวมค้างจ่าย</td>'+
+    '</tbody><tfoot><tr><td colspan="5" class="r" style="font-weight:600">รวมค้างจ่าย</td>'+
     '<td class="r num" style="font-weight:700;font-size:17px">'+money(dueTotal)+'</td><td colspan="2"></td></tr></tfoot></table>'
    :'<div class="empty">ไม่มีรายการค้างจ่าย — จ่ายครบทุกงวดแล้ว</div>')+
   '</div></div>'+
@@ -454,7 +480,8 @@ function viewPay(){
           '<td data-l="ยอดจ่ายจริง" class="r num" style="font-weight:600">'+money(paidNet(p))+'</td>'+
           '<td data-l="เลขที่ใบเบิก" class="num">'+esc(p.invoice||"—")+'</td><td data-l="วันที่เบิก" class="num">'+thDate(p.reqDate)+'</td>'+
           '<td data-l="วันที่โอน" class="num">'+(p.paidDate?thDate(p.paidDate):'<span class="muted">—</span>')+'</td>'+
-          '<td data-l="สถานะ" class="c"><span class="pill '+st+'">'+statusLabel(st)+(st!=="paid"&&age!=null?" "+age+" วัน":"")+'</span></td>'+
+          '<td data-l="สถานะ" class="c"><span class="pill '+st+'">'+statusLabel(st)+'</span>'+
+          (st!=="paid"?'<div class="muted" style="font-size:12px;margin-top:3px">'+esc(dueNote(p)||((age!=null?age+" วันหลังยื่นเบิก":"")))+'</div>':'')+'</td>'+
           '<td data-l="เอกสาร" class="c"><div>'+docChip("payment",p)+'</div></td>'+
           '<td><div class="rowacts"><button class="btn ghost sm" data-edit="pay:'+p.id+'">แก้ไข</button>'+
           '<button class="btn ghost sm" data-del="pay:'+p.id+'">ลบ</button></div></td></tr>';
@@ -771,6 +798,7 @@ function viewSetup(){
       '<div class="bar"><span style="width:'+Math.min(100,s.billed/Math.max(1,c.amount)*100)+'%"></span></div>'+
       '<div class="muted" style="font-size:13.5px;margin-top:6px">เบิกแล้ว '+money(s.billed)+' บาท · คงเหลือ '+money(s.rest)+' บาท</div>'+
       (c.endDate?'<div style="font-size:14px;margin-top:8px">กำหนดแล้วเสร็จตามสัญญา <b class="num">'+thDateFull(c.endDate)+'</b></div>':'')+
+      (c.dueDay?'<div style="font-size:14px;margin-top:4px">ครบกำหนดจ่ายทุกวันที่ <b class="num">'+esc(c.dueDay)+'</b> ของเดือน</div>':'')+
       '<div style="font-size:13.5px;color:var(--ink-3);margin-top:8px;line-height:1.5">'+esc(c.bank||"")+'</div>'+
       '<div class="ctr-docs">'+docChip("contract",c)+
       '<button class="clip" data-files="contract:'+c.id+'">เอกสารสัญญา'+
@@ -875,11 +903,12 @@ function editContract(id){
     '<div class="f-3">'+fld("amount","มูลค่าสัญญา (บาท)",c.amount,"number")+fld("periods","จำนวนงวด",c.periods,"number")+
     fld("endDate","กำหนดแล้วเสร็จ",c.endDate,"date")+'</div>'+
     '<div class="f-3">'+fld("vat","VAT (%)",c.vat,"number")+fld("retention","หักประกัน (%)",c.retention,"number")+
-    fld("order","ลำดับแสดงผล",c.order,"number")+'</div>'+
+    fld("dueDay","ครบกำหนดจ่ายทุกวันที่ (เว้นว่าง = ไม่กำหนด)",c.dueDay,"number")+'</div>'+
+    '<div class="f-2">'+fld("order","ลำดับแสดงผล",c.order,"number")+'</div>'+
     fld("bank","บัญชีรับเงิน",c.bank,"textarea"),
     async o=>{ await save(COLS.contracts, id||uid("c"), {code:o.code,name:o.name,contractor:o.contractor,
       amount:Number(o.amount||0),periods:Number(o.periods||0),endDate:o.endDate,vat:Number(o.vat||0),
-      retention:Number(o.retention||0),order:Number(o.order||0),bank:o.bank}); });
+      retention:Number(o.retention||0),dueDay:o.dueDay?Number(o.dueDay):null,order:Number(o.order||0),bank:o.bank}); });
 }
 
 /* ---------- attachment drawer ---------- */
@@ -961,10 +990,11 @@ function saveCSV(name,rows){
   setTimeout(()=>URL.revokeObjectURL(url),4000);
 }
 function payRows(){
-  const out=[["สัญญา","งวดที่","รายละเอียดงาน","มูลค่างวด","VAT","หักประกัน","ยอดจ่ายจริง","เลขที่ใบเบิก","วันที่เบิก","วันที่โอน","สถานะ","เอกสารแนบ"]];
+  const out=[["สัญญา","งวดที่","รายละเอียดงาน","มูลค่างวด","VAT","หักประกัน","ยอดจ่ายจริง","เลขที่ใบเบิก","วันที่เบิก","ครบกำหนดจ่าย","วันที่โอน","สถานะ","เอกสารแนบ"]];
   S.contracts.forEach(c=>S.payments.filter(p=>p.contractId===c.id).forEach(p=>
     out.push([c.code,p.seq,p.detail,p.amount,p.vat,p.retention,paidNet(p),p.invoice,thDateFull(p.reqDate),
-      p.paidDate?thDateFull(p.paidDate):"",statusLabel(pstatus(p)),filesFor("payment",p.id).length])));
+      dueDateOf(p)?thDateFull(dueDateOf(p)):"",p.paidDate?thDateFull(p.paidDate):"",
+      statusLabel(pstatus(p)),filesFor("payment",p.id).length])));
   return out;
 }
 function rfaRows(){
