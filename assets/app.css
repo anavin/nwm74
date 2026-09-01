@@ -485,30 +485,8 @@ tr.flash>td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .card.flash{animation:flashrow 2.4s ease-out}
 @media(prefers-reduced-motion:reduce){tr.flash>td,.card.flash{animation:none;background:var(--accent-soft)}}
 
-/* ---------- หัวกลุ่มในตารางค้างจ่าย ---------- */
-tr.ghead>td{background:var(--surface-2);border-top:1px solid var(--line);
-  border-bottom:1px solid var(--line);padding:11px 16px}
-tbody tr:first-child.ghead>td{border-top:0}
-.gh{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
-.gh-nm{flex:1;min-width:180px}
-.gh-nm .golink{font-size:14.5px}
-.gh-who{font-size:12.5px;color:var(--ink-3);margin-top:2px}
-.gh-meta{font-size:13px;color:var(--ink-3);white-space:nowrap}
+/* ตัวเลขเน้นสีแดง (ใช้ในสรุปจำนวนงานขออนุมัติ) */
 .ghlate{color:var(--late);font-weight:600}
-.gh-sum{font-size:16px;font-weight:700;white-space:nowrap;min-width:110px;text-align:right}
-@media(max-width:880px){
-  /* หัวกลุ่มต้องเป็นหัวข้อ ไม่ใช่การ์ด */
-  tbody tr.ghead{background:transparent;border:0;border-radius:0;box-shadow:none;
-    padding:0;margin:18px 0 8px}
-  tbody tr.ghead:first-child{margin-top:0}
-  tr.ghead>td{background:transparent;border:0;border-bottom:1px solid var(--line-strong);
-    padding:0 0 8px;display:block;text-align:left !important}
-  .gh{display:grid;grid-template-columns:1fr auto;gap:3px 12px;align-items:baseline}
-  .gh-nm{grid-column:1/-1;min-width:0}
-  .gh-nm .golink{font-size:15px;line-height:1.35;white-space:normal}
-  .gh-meta{grid-column:1;white-space:normal}
-  .gh-sum{grid-column:2;min-width:0;text-align:right;font-size:17px}
-}
 
 /* สรุปจำนวนงานขออนุมัติ ในหัวการ์ด */
 .rfatally{display:inline-block;font-size:13px;color:var(--ink-2);letter-spacing:.01em}
@@ -518,13 +496,13 @@ tbody tr:first-child.ghead>td{border-top:0}
 
 /* ---------- การ์ดรายการค้างจ่ายบนมือถือ: ไม่ซ้ำชื่อคอลัมน์ทุกบรรทัด ---------- */
 @media(max-width:880px){
-  .duetbl tbody tr:not(.ghead){display:grid;grid-template-columns:1fr auto;
+  .duetbl tbody tr{display:grid;grid-template-columns:1fr auto;
     gap:3px 14px;align-items:baseline;padding:14px 15px}
-  .duetbl tbody tr:not(.ghead)>td{display:block;padding:0;border:0;margin:0;
+  .duetbl tbody tr>td{display:block;padding:0;border:0;margin:0;
     text-align:left !important;white-space:normal}
   .duetbl td:before{content:none !important}
 
-  .duetbl tbody tr:not(.ghead)>td[data-l="รายการ"]{grid-column:1/-1;padding:0 0 8px;
+  .duetbl tbody tr>td[data-l="รายการ"]{grid-column:1/-1;padding:0 0 8px;
     margin-bottom:7px;border-bottom:1px dashed var(--line)}
   .duetbl td[data-l="เลขที่ใบเบิก"]{grid-column:1;font-size:14px;font-weight:600}
   .duetbl td[data-l="ยอดที่ต้องโอน"]{grid-column:2;grid-row:2/5;align-self:center;
@@ -539,7 +517,7 @@ tbody tr:first-child.ghead>td{border-top:0}
     text-transform:none;color:var(--ink-3);padding:0;margin:0}
   .duetbl td[data-l="สถานะเวลา"]{grid-column:1/-1;margin-top:8px}
   .duetbl td[data-l="เอกสาร"]{grid-column:1;margin-top:9px}
-  .duetbl tbody tr:not(.ghead)>td:last-child{grid-column:2;margin-top:9px;
+  .duetbl tbody tr>td:last-child{grid-column:2;margin-top:9px;
     text-align:right !important}
   .duetbl .rowacts{justify-content:flex-end}
   /* แถวรวมท้ายตาราง: ป้ายซ้าย ยอดขวา ในกล่องเดียว */
