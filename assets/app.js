@@ -480,17 +480,6 @@ function viewDash(){
          }).join("")) || '<div class="muted">ไม่มีงานค้างอนุมัติ</div>')+
       '</div></div>'+
 
-      '<div class="card"><div class="card-h"><h3>เอกสารล่าสุด</h3>'+
-      '<span class="hint">'+S.files.length+' ไฟล์</span></div><div class="card-b" style="padding-top:4px">'+
-      (S.files.length? S.files.slice(0,5).map(f=>
-        '<div class="filerow"><div class="ic'+(f.url?" link":"")+'">'+
-        (f.url?"LINK":esc((f.name.split(".").pop()||"?").slice(0,4).toUpperCase()))+'</div>'+
-        '<div style="flex:1;min-width:0"><div class="nm">'+esc(f.name)+'</div>'+
-        '<div class="mt">'+(f.url?"ลิงก์":bytes(f.size))+' · '+thDate((f.createdAt||"").slice(0,10))+'</div></div>'+
-        '<button class="btn ghost sm" data-dl="'+f.id+'">เปิด</button></div>').join("")
-       : '<div class="empty" style="padding:26px 10px">ยังไม่มีเอกสารแนบ — แนบได้จากปุ่มในแต่ละรายการ</div>')+
-      '</div></div>'+
-
     '</div>'+
   '</div>'+
 
