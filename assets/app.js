@@ -15,6 +15,10 @@ function thDateFull(iso){
   const d=new Date(iso+"T00:00:00"); if(isNaN(d)) return iso;
   return d.getDate()+" "+TH_M[d.getMonth()]+" "+(d.getFullYear()+543);
 }
+/* toISOString() คืนค่าเป็น UTC — ที่ไทย (UTC+7) จะได้วันก่อนหน้า 1 วัน
+   ทุกที่ที่แปลง Date เป็น YYYY-MM-DD ต้องใช้ isoLocal เท่านั้น */
+const isoLocal = d => d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const todayISO = () => isoLocal(new Date());
 const TODAY = new Date(); TODAY.setHours(0,0,0,0);
 function daysBetween(isoA,isoB){
   if(!isoA) return null;
@@ -38,13 +42,13 @@ const S = {db:null, dl:null, mode:"local", view:"dash",
 
 const COLS = {contracts:"contracts", payments:"payments", extras:"extras", eots:"eot", rfas:"rfa", files:"files"};
 function addDays(iso,d){ if(!iso) return ""; const x=new Date(iso+"T00:00:00"); if(isNaN(x)) return "";
-  x.setDate(x.getDate()+Number(d||0)); return x.toISOString().slice(0,10); }
+  x.setDate(x.getDate()+Number(d||0)); return isoLocal(x); }
 function rfaDeadline(r){ return r.requiredOn ? addDays(r.requiredOn, -Number(r.leadDays||0)) : ""; }
 function rfaState(r){
   const st=r.status||"ยังไม่ยื่น";
   if(st==="อนุมัติแล้ว"||st==="อนุมัติตามหมายเหตุ") return "paid";
   if(st==="ไม่อนุมัติ"||st==="ให้แก้ไข/ยื่นใหม่") return "late";
-  const dl=rfaDeadline(r), today=new Date().toISOString().slice(0,10);
+  const dl=rfaDeadline(r), today=todayISO();
   if(st==="ยังไม่ยื่น") return (dl && dl<today) ? "late" : "idle";
   const over = (r.dueDate && r.dueDate<today) || (dl && dl<today) || (daysBetween(r.submitDate)||0)>14;
   return over ? "late" : "due";
@@ -60,7 +64,7 @@ function addWorkdays(iso,n){
   const d=new Date(iso+"T00:00:00"); if(isNaN(d)) return "";
   let left=Number(n||0);
   while(left>0){ d.setDate(d.getDate()+1); const w=d.getDay(); if(w!==0&&w!==6) left--; }
-  return d.toISOString().slice(0,10);
+  return isoLocal(d);
 }
 const vatRate = c => Number(c&&c.vat||0)/100;
 /* มูลค่าสัญญา: amount = เนื้องาน (ก่อน VAT) · total = รวม VAT */
@@ -80,7 +84,7 @@ function dueDateOf(r){
   const mk=(y,m)=>{ const last=new Date(y,m+1,0).getDate(); return new Date(y,m,Math.min(d,last)); };
   let x=mk(t.getFullYear(),t.getMonth());
   if(x<t) x=mk(t.getFullYear(),t.getMonth()+1);
-  return x.toISOString().slice(0,10);
+  return isoLocal(x);
 }
 /* จำนวนวันที่เลยกำหนด (บวก = เลยแล้ว, ลบ = ยังไม่ถึงกำหนด) */
 function overdueDays(r){
@@ -123,12 +127,12 @@ function contractStats(c){
 function retentionDue(c){
   if(!c.handoverDate) return "";
   const d=new Date(c.handoverDate+"T00:00:00"); if(isNaN(d)) return "";
-  d.setFullYear(d.getFullYear()+1); return d.toISOString().slice(0,10);
+  d.setFullYear(d.getFullYear()+1); return isoLocal(d);
 }
 function warrantyEnd(c,years){
   if(!c.handoverDate) return "";
   const d=new Date(c.handoverDate+"T00:00:00"); if(isNaN(d)) return "";
-  d.setFullYear(d.getFullYear()+years); return d.toISOString().slice(0,10);
+  d.setFullYear(d.getFullYear()+years); return isoLocal(d);
 }
 function totals(){
   const t={contract:0,billed:0,paid:0,due:0,extra:0,extraPaid:0};
@@ -345,7 +349,7 @@ function goTo(view,opts){
 function viewDash(){
   tools('<button class="btn" data-act="export-all">ส่งออก CSV ทั้งโครงการ</button>');
   const t=totals(), lag=avgPayLag(), end=currentEnd(), pend=pendingEnd();
-  const left=daysBetween(new Date().toISOString().slice(0,10), end);
+  const left=daysBetween(todayISO(), end);
   const approved=S.eots.filter(e=>e.status==="อนุมัติแล้ว").reduce((s,e)=>s+Number(e.days||0),0);
   const waiting=S.eots.filter(e=>e.status==="รออนุมัติ").reduce((s,e)=>s+Number(e.days||0),0);
   const rfaLate=S.rfas.filter(r=>rfaState(r)==="late"), rfaDue=S.rfas.filter(r=>rfaState(r)==="due");
@@ -439,7 +443,7 @@ function viewDash(){
       const da=rfaDeadline(a)||"9999", db=rfaDeadline(b)||"9999";
       return da.localeCompare(db) || (a.order||0)-(b.order||0);
     }).slice(0,8).map(r=>{
-      const st=rfaState(r), dl=rfaDeadline(r), today=new Date().toISOString().slice(0,10);
+      const st=rfaState(r), dl=rfaDeadline(r), today=todayISO();
       const lateDl = dl && dl<today && st!=="paid";
       return '<tr><td data-l="หมวดงาน" class="stripe '+(st==="idle"?"":st)+'" style="min-width:220px">'+
         '<button class="golink strong" data-go="rfa#rfa:'+r.id+'">'+esc(r.title||"—")+'</button>'+
@@ -651,7 +655,7 @@ const RFA_LABEL = {idle:"ยังไม่ยื่น",due:"รออนุม
 function viewRfa(){
   tools('<button class="btn" data-act="export-rfa">ส่งออก CSV</button>'+
         '<button class="btn primary" data-act="new-rfa">+ เพิ่มรายการขออนุมัติ</button>');
-  const f=S.filter, today=new Date().toISOString().slice(0,10);
+  const f=S.filter, today=todayISO();
   const trades=[...new Set(S.rfas.map(r=>r.trade).filter(Boolean))];
   let rows=S.rfas.slice();
   if(f.contract) rows=rows.filter(r=>r.trade===f.contract);
@@ -886,7 +890,7 @@ async function runImport(){
 /* ---------- docs ---------- */
 function viewDocs(){
   tools('<button class="btn" data-view="import">นำเข้าเอกสารทั้งโฟลเดอร์</button>');
-  const f=S.filter, today=new Date().toISOString().slice(0,10);
+  const f=S.filter, today=todayISO();
   const REF_LABEL={payment:"งวดงาน",extra:"งานเพิ่ม",rfa:"งานขออนุมัติ",eot:"ขอขยายเวลา",contract:"สัญญา"};
 
   /* ชื่อรายการที่ไฟล์ผูกอยู่ */
