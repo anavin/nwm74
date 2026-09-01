@@ -181,6 +181,42 @@ const Store = (() => {
     if(error) throw error;
   }
 
+  /* ---------------- ประวัติการใช้งาน ----------------
+     บันทึกแบบไม่บล็อก: ถ้าเขียนไม่ได้ (ยังไม่ได้สร้างตาราง ฯลฯ) ก็ปล่อยผ่าน
+     ไม่ให้กระทบการทำงานหลักของผู้ใช้ */
+  let _who = null;
+  async function whoAmI(){
+    if(_who) return _who;
+    const {data} = await sb.auth.getUser();
+    const u = data && data.user;
+    if(!u) return null;
+    let name = displayName(u.email||"");
+    try{
+      const r = await sb.from("members").select("username,name").eq("user_id", u.id).maybeSingle();
+      if(r && r.data) name = r.data.username || name;
+    }catch(e){}
+    _who = {id:u.id, username:name};
+    return _who;
+  }
+  async function logActivity(action, refType, refId, summary){
+    try{
+      const me = await whoAmI(); if(!me) return;
+      await sb.from("activity").insert({
+        user_id: me.id, username: me.username, action,
+        ref_type: refType || null, ref_id: refId ? String(refId) : null,
+        summary: summary || null
+      });
+    }catch(e){ /* เงียบไว้ — ประวัติห้ามทำให้งานหลักล้ม */ }
+  }
+  async function readActivity(limit, userId){
+    let q = sb.from("activity").select("*").order("created_at",{ascending:false}).limit(limit||200);
+    if(userId) q = q.eq("user_id", userId);
+    const {data, error} = await q;
+    if(error) throw error;
+    return (data||[]).map(r=>({id:r.id, userId:r.user_id, username:r.username||"", action:r.action,
+      refType:r.ref_type||"", refId:r.ref_id||"", summary:r.summary||"", createdAt:r.created_at}));
+  }
+
   /* ---------------- จัดการผู้ใช้ (เรียก API ฝั่งเซิร์ฟเวอร์) ----------------
      คีย์ service_role อยู่ที่ Vercel เท่านั้น เบราว์เซอร์ไม่เคยเห็น
      ที่ส่งไปคือ access token ของคนที่ล็อกอินอยู่ ให้เซิร์ฟเวอร์ตรวจว่าเป็นแอดมินจริง */
@@ -203,18 +239,21 @@ const Store = (() => {
   const updateMember  = (b)  => api("PATCH", b);
   const deleteMember  = (id) => api("DELETE", {userId:id});
 
-  /* role ของคนที่ล็อกอินอยู่ — ใช้ซ่อน/แสดงเมนูผู้ใช้งาน */
-  async function myRole(){
+  /* ข้อมูลของคนที่ล็อกอินอยู่ — ใช้แสดงชื่อและซ่อน/แสดงเมนูผู้ใช้งาน */
+  async function myProfile(){
+    const blank = {role:"", name:"", username:""};
     try{
       const {data} = await sb.auth.getUser();
-      const uid = data && data.user && data.user.id;
-      if(!uid) return "";
-      const r = await sb.from("members").select("role").eq("user_id", uid).maybeSingle();
-      return (r.data && r.data.role) || "member";
-    }catch(e){ return ""; }   /* ยังไม่ได้สร้างตาราง members = ไม่มีระบบสมาชิก */
+      const u = data && data.user;
+      if(!u) return blank;
+      const fallback = displayName(u.email || "");
+      const r = await sb.from("members").select("role,name,username").eq("user_id", u.id).maybeSingle();
+      const m = (r && r.data) || {};
+      return {role: m.role || "", name: m.name || "", username: m.username || fallback};
+    }catch(e){ return blank; }   /* ยังไม่ได้สร้างตาราง members = ไม่มีระบบสมาชิก */
   }
 
-  return {init, onAuth, signIn, signOut, displayName, myRole,
+  return {init, onAuth, signIn, signOut, displayName, myProfile, logActivity, readActivity,
           listMembers, createMember, updateMember, deleteMember,
           loadAll, save, patch, remove, subscribe, uploadFile, addLink, fileUrl, deleteFile,
           get client(){ return sb; }};

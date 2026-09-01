@@ -38,7 +38,7 @@ const RFA_STATUS = ["ยังไม่ยื่น","รออนุมัต�
 /* ============================ state ============================ */
 const S = {db:null, dl:null, mode:"local", view:"dash",
            contracts:[], payments:[], extras:[], eots:[], rfas:[], files:[],
-           filter:{contract:"", status:"", q:""}, seeded:false, role:"", members:[], me:""};
+           filter:{contract:"", status:"", q:""}, seeded:false, role:"", members:[], me:"", acts:[], actUser:"", actErr:"", usersErr:""};
 
 const COLS = {contracts:"contracts", payments:"payments", extras:"extras", eots:"eot", rfas:"rfa", files:"files"};
 function addDays(iso,d){ if(!iso) return ""; const x=new Date(iso+"T00:00:00"); if(isNaN(x)) return "";
@@ -163,9 +163,14 @@ async function boot(){
   Store.onAuth(async session=>{
     if(!session){ showLogin(); return; }
     hideLogin();
-    S.role = await Store.myRole();
-    $("#dbstate").innerHTML = "เข้าสู่ระบบ: " + esc(Store.displayName(session.user.email||"")) +
-      (S.role==="admin" ? ' <span class="rolechip">แอดมิน</span>' : "");
+    const prof = await Store.myProfile();
+    S.role = prof.role;
+    const uname = prof.username || Store.displayName(session.user.email||"");
+    $("#dbstate").innerHTML =
+      '<div class="whoami"><div class="wa-lab">เข้าสู่ระบบ</div>'+
+      '<div class="wa-nm">'+esc(prof.name || uname)+
+        (S.role==="admin" ? ' <span class="rolechip">แอดมิน</span>' : "")+'</div>'+
+      (prof.name ? '<div class="wa-id num">@'+esc(uname)+'</div>' : "")+'</div>';
     await refresh();
     Store.subscribe(()=>refresh());
   });
@@ -185,12 +190,53 @@ async function refresh(){
     S.mode="db"; sortRows(); renderAll();
   }catch(e){ toast("โหลดข้อมูลไม่สำเร็จ: "+(e.message||e)); }
 }
+/* ---- ประวัติการใช้งาน: แปลงรายการเป็นข้อความที่คนอ่านรู้เรื่อง ---- */
+const REF_LABEL = {payments:"งวดงาน", extras:"งานเพิ่ม", rfa:"งานขออนุมัติ", eot:"คำขอขยายเวลา",
+                   contracts:"สัญญา", files:"เอกสารแนบ"};
+function describe(col,id,body){
+  const b = body||{};
+  if(col===COLS.payments){
+    const c=S.contracts.find(x=>x.id===b.contractId);
+    return (c?c.code+" · ":"")+"งวดที่ "+(b.seq||"?")+(b.invoice?" ("+b.invoice+")":"")+
+      (b.paidDate?" — บันทึกการโอน "+thDate(b.paidDate):"");
+  }
+  if(col===COLS.extras)  return "งานเพิ่ม "+(b.building||"")+(b.invoice?" ("+b.invoice+")":"");
+  if(col===COLS.rfas)    return (b.title||"รายการขออนุมัติ")+(b.docNo?" ("+b.docNo+")":"")+
+                                (b.status?" — "+b.status:"");
+  if(col===COLS.eots)    return "ขอขยายเวลาครั้งที่ "+(b.no||"?")+(b.docNo?" ("+b.docNo+")":"");
+  if(col===COLS.contracts) return "สัญญา "+(b.code||"")+" "+(b.name||"");
+  return (REF_LABEL[col]||col)+" "+id;
+}
+/* ป้ายสั้นๆ ของรายการที่เอกสารแนบอยู่ */
+function refLabel(rt,id){
+  const r = refRecord(rt,id) || {};
+  if(rt==="payment"){ const c=S.contracts.find(x=>x.id===r.contractId);
+    return (c?c.code+" · ":"")+"งวดที่ "+(r.seq||"?")+(r.invoice?" ("+r.invoice+")":""); }
+  if(rt==="extra")    return "งานเพิ่ม "+(r.building||"");
+  if(rt==="rfa")      return r.title || "รายการขออนุมัติ";
+  if(rt==="eot")      return "ขอขยายเวลาครั้งที่ "+(r.no||"?");
+  if(rt==="contract") return "สัญญา "+(r.code||"");
+  return rt+" "+id;
+}
+function describeExisting(col,id){
+  const pools={[COLS.payments]:S.payments,[COLS.extras]:S.extras,[COLS.rfas]:S.rfas,
+               [COLS.eots]:S.eots,[COLS.contracts]:S.contracts};
+  const rec=(pools[col]||[]).find(x=>x.id===id);
+  return rec ? describe(col,id,rec) : (REF_LABEL[col]||col)+" "+id;
+}
 async function save(col,id,body){
-  try{ await Store.save(col,id,body); await refresh(); }
+  const isNew = !((({[COLS.payments]:S.payments,[COLS.extras]:S.extras,[COLS.rfas]:S.rfas,
+                     [COLS.eots]:S.eots,[COLS.contracts]:S.contracts})[col]||[]).some(x=>x.id===id));
+  try{
+    await Store.save(col,id,body);
+    Store.logActivity(isNew?"create":"update", col, id, describe(col,id,body));
+    await refresh();
+  }
   catch(e){ throw new Error(e.message||e); }
 }
 async function remove(col,id){
-  try{ await Store.remove(col,id); await refresh(); }
+  const what = describeExisting(col,id);
+  try{ await Store.remove(col,id); Store.logActivity("delete", col, id, what); await refresh(); }
   catch(e){ toast("ลบไม่สำเร็จ: "+(e.message||e)); }
 }
 
@@ -259,7 +305,9 @@ async function uploadFiles(list, refType, refId, docType){
   for(const f of list){
     if(f.size>MAX_FILE){ toast("ไฟล์ "+f.name+" ใหญ่เกิน 50 MB"); continue; }
     const t = docType || guessType(f.name, refType);
-    try{ await Store.uploadFile(f,refType,refId,t); toast("แนบ "+f.name+" เป็น "+docMeta(refType,t)[1]); }
+    try{ await Store.uploadFile(f,refType,refId,t);
+         Store.logActivity("upload","files",refId, "แนบ "+f.name+" ("+docMeta(refType,t)[1]+") กับ "+refLabel(refType,refId));
+         toast("แนบ "+f.name+" เป็น "+docMeta(refType,t)[1]); }
     catch(e){ toast("อัปโหลดไม่สำเร็จ: "+(e.message||e)); }
   }
   await refresh();
@@ -293,7 +341,8 @@ async function downloadFile(f){
 }
 async function deleteFile(f){
   if(!confirm("ลบเอกสาร \""+f.name+"\" ?")) return;
-  try{ await Store.deleteFile(f); toast("ลบเอกสารแล้ว"); await refresh(); }
+  try{ await Store.deleteFile(f); Store.logActivity("unlink","files",f.refId,"ลบเอกสาร "+f.name);
+       toast("ลบเอกสารแล้ว"); await refresh(); }
   catch(e){ toast("ลบไม่สำเร็จ: "+(e.message||e)); }
 }
 async function fileData(f){ return null; }
@@ -1051,6 +1100,22 @@ function viewSetup(){
 async function loadMembers(){
   try{ const r = await Store.listMembers(); S.members = r.members||[]; S.me = r.me||""; S.usersErr=""; }
   catch(e){ S.members=[]; S.usersErr = e.message||"โหลดรายชื่อไม่สำเร็จ"; }
+  try{ S.acts = await Store.readActivity(300, S.actUser||""); S.actErr=""; }
+  catch(e){ S.acts=[]; S.actErr = "ยังไม่ได้สร้างตารางประวัติ — รัน supabase/migration-2026-09-activity.sql"; }
+}
+const ACT_LABEL = {create:"เพิ่ม", update:"แก้ไข", delete:"ลบ", upload:"แนบไฟล์",
+                   link:"แนบลิงก์", unlink:"ลบไฟล์", login:"เข้าสู่ระบบ"};
+const ACT_CLASS = {create:"paid", update:"info", delete:"late", upload:"info", link:"info",
+                   unlink:"due", login:"info"};
+function whenText(iso){
+  if(!iso) return "—";
+  const d=new Date(iso); if(isNaN(d)) return iso;
+  const mins=Math.round((Date.now()-d.getTime())/60000);
+  const clock=String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+  if(mins<1) return "เมื่อครู่";
+  if(mins<60) return mins+" นาทีที่แล้ว";
+  if(mins<1440) return Math.round(mins/60)+" ชั่วโมงที่แล้ว · "+clock;
+  return thDate(isoLocal(d))+" · "+clock;
 }
 function viewUsers(){
   tools('<button class="btn primary" data-act="new-user">+ เพิ่มผู้ใช้</button>');
@@ -1091,6 +1156,28 @@ function viewUsers(){
       '</div></td></tr>';
   }).join("") : '<tr><td colspan="7"><div class="empty">ยังไม่มีผู้ใช้ในระบบ</div></td></tr>')+
   '</tbody></table></div></div>'+
+  /* ============ ประวัติการใช้งาน ============ */
+  '<div class="card" style="margin-top:16px"><div class="card-h"><h3>ประวัติการใช้งาน</h3>'+
+  '<span class="hint">'+(S.acts||[]).length+' รายการล่าสุด · เรียงจากใหม่ไปเก่า</span></div>'+
+  (S.actErr ? '<div class="card-b muted" style="line-height:1.7">'+esc(S.actErr)+'</div>' :
+  '<div class="card-b" style="padding-bottom:0"><div class="filters">'+
+    '<select data-actuser><option value="">ทุกคน</option>'+
+      rows.map(m=>'<option value="'+esc(m.userId)+'"'+(S.actUser===m.userId?" selected":"")+'>'+
+        esc(m.name||m.username)+'</option>').join("")+'</select>'+
+  '</div></div>'+
+  '<div class="tablewrap"><table><thead><tr><th>เมื่อไหร่</th><th>ใคร</th>'+
+  '<th class="c">ทำอะไร</th><th>รายการ</th></tr></thead><tbody>'+
+  ((S.acts||[]).length ? S.acts.map(a=>{
+    const who = (rows.find(m=>m.userId===a.userId)||{});
+    return '<tr><td data-l="เมื่อไหร่" class="num" style="white-space:nowrap">'+esc(whenText(a.createdAt))+'</td>'+
+      '<td data-l="ใคร" style="font-weight:600">'+esc(who.name || a.username || "—")+
+        (who.name?'<div class="muted num" style="font-weight:400;font-size:12.5px">@'+esc(a.username)+'</div>':'')+'</td>'+
+      '<td data-l="ทำอะไร" class="c"><span class="pill '+(ACT_CLASS[a.action]||"info")+'">'+
+        esc(ACT_LABEL[a.action]||a.action)+'</span></td>'+
+      '<td data-l="รายการ">'+esc(a.summary||"—")+'</td></tr>';
+  }).join("") : '<tr><td colspan="4"><div class="empty">ยังไม่มีประวัติการใช้งาน</div></td></tr>')+
+  '</tbody></table></div>')+'</div>'+
+
   '<div class="card" style="margin-top:14px"><div class="card-b muted" style="font-size:14px;line-height:1.75">'+
   '<b>แอดมิน</b> — จัดการผู้ใช้ได้ (เพิ่ม ลบ เปลี่ยนรหัส เปลี่ยนสิทธิ์) และแก้ข้อมูลโครงการได้ทุกอย่าง<br>'+
   '<b>ผู้ใช้ทั่วไป</b> — แก้ข้อมูลโครงการได้ทุกอย่างเหมือนกัน แต่ไม่เห็นเมนูนี้<br>'+
@@ -1450,7 +1537,9 @@ document.addEventListener("keydown",e=>{
   const g=e.target.closest('[data-go][role="button"]'); if(!g) return;
   e.preventDefault(); g.click();
 });
-document.addEventListener("change",e=>{
+document.addEventListener("change",async e=>{
+  const au=e.target.closest("[data-actuser]");
+  if(au){ S.actUser=au.value; await loadMembers(); renderAll(); return; }
   const im=e.target.closest("[data-imp]");
   if(im){ const i=+im.dataset.imp, row=S.imp[i];
     if(im.dataset.f==="rt"){ const [rt,id]=(im.value||":").split(":"); row.rt=rt; row.id=id;
