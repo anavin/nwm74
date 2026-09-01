@@ -847,28 +847,99 @@ async function runImport(){
 
 /* ---------- docs ---------- */
 function viewDocs(){
-  tools("");
-  const refLabel=f=>{
-    if(f.refType==="payment"){ const p=S.payments.find(x=>x.id===f.refId); const c=p&&S.contracts.find(c=>c.id===p.contractId);
-      return p?((c?c.code+" · ":"")+"งวดที่ "+p.seq+" ("+(p.invoice||"—")+")"):"งวดงานที่ถูกลบ"; }
-    if(f.refType==="extra"){ const x=S.extras.find(x=>x.id===f.refId); return x?("งานเพิ่ม · "+x.building):"งานเพิ่มที่ถูกลบ"; }
-    if(f.refType==="contract"){ const c=S.contracts.find(x=>x.id===f.refId); return c?("สัญญา · "+c.code):"สัญญาที่ถูกลบ"; }
-    if(f.refType==="rfa"){ const r=S.rfas.find(x=>x.id===f.refId); return r?("ขออนุมัติ · "+(r.trade||r.title)+(r.docNo?" ("+r.docNo+")":"")):"รายการขออนุมัติที่ถูกลบ"; }
-    if(f.refType==="eot"){ const e=S.eots.find(x=>x.id===f.refId); return e?("ขอขยายเวลาครั้งที่ "+e.no+" · "+e.docNo):"คำขอที่ถูกลบ"; }
-    return "โครงการ";
+  tools('<button class="btn" data-view="import">นำเข้าเอกสารทั้งโฟลเดอร์</button>');
+  const f=S.filter, today=new Date().toISOString().slice(0,10);
+  const REF_LABEL={payment:"งวดงาน",extra:"งานเพิ่ม",rfa:"งานขออนุมัติ",eot:"ขอขยายเวลา",contract:"สัญญา"};
+
+  /* ชื่อรายการที่ไฟล์ผูกอยู่ */
+  const refInfo=f=>{
+    if(f.refType==="payment"){ const p=S.payments.find(x=>x.id===f.refId); const c=p&&contractOf(p);
+      return p?{group:(c?c.code:"—")+" · งวดที่ "+p.seq, sub:(p.invoice||"")+" · "+esc(String(p.detail||"").slice(0,60)), key:"payment:"+p.id}
+              :{group:"งวดงานที่ถูกลบ",sub:"",key:"x"}; }
+    if(f.refType==="extra"){ const x=S.extras.find(v=>v.id===f.refId);
+      return x?{group:"งานเพิ่ม · "+x.building, sub:x.invoice||"", key:"extra:"+x.id}:{group:"งานเพิ่มที่ถูกลบ",sub:"",key:"x"}; }
+    if(f.refType==="rfa"){ const r=S.rfas.find(v=>v.id===f.refId);
+      return r?{group:"ขออนุมัติ · "+(r.title||""), sub:(r.docNo||"")+" "+(r.brand||""), key:"rfa:"+r.id}:{group:"รายการขออนุมัติที่ถูกลบ",sub:"",key:"x"}; }
+    if(f.refType==="eot"){ const e=S.eots.find(v=>v.id===f.refId);
+      return e?{group:"ขอขยายเวลา ครั้งที่ "+e.no, sub:e.docNo||"", key:"eot:"+e.id}:{group:"คำขอที่ถูกลบ",sub:"",key:"x"}; }
+    if(f.refType==="contract"){ const c=S.contracts.find(v=>v.id===f.refId);
+      return c?{group:"สัญญา · "+c.code, sub:c.contractor||"", key:"contract:"+c.id}:{group:"สัญญาที่ถูกลบ",sub:"",key:"x"}; }
+    return {group:"อื่นๆ",sub:"",key:"x"};
   };
-  $("#view").innerHTML='<div class="card"><div class="card-h"><h3>เอกสารแนบทั้งหมด</h3>'+
-   '<span class="hint">'+S.files.length+' ไฟล์ · รวม '+bytes(S.files.reduce((s,f)=>s+Number(f.size||0),0))+'</span></div>'+
-   '<div class="tablewrap"><table><thead><tr><th>ชื่อไฟล์</th><th>ผูกกับรายการ</th><th>ประเภท</th>'+
-   '<th class="r">ขนาด</th><th>วันที่แนบ</th><th></th></tr></thead><tbody>'+
-   (S.files.length?S.files.map(f=>'<tr><td data-l="ชื่อไฟล์">'+esc(f.name)+'</td><td data-l="ผูกกับรายการ" class="muted">'+esc(refLabel(f))+'</td>'+
-     '<td data-l="ประเภท"><span class="pill info">'+esc(docMeta(f.refType,f.docType||"other")[1])+'</span></td>'+
-     '<td data-l="ขนาด" class="r num">'+(f.url?'<span class="pill info">ลิงก์</span>':bytes(f.size))+'</td>'+
-     '<td data-l="วันที่แนบ" class="num">'+thDate((f.createdAt||"").slice(0,10))+'</td>'+
-     '<td><div class="rowacts"><button class="btn ghost sm" data-dl="'+f.id+'">ดาวน์โหลด</button>'+
-     '<button class="btn ghost sm" data-rmfile="'+f.id+'">ลบ</button></div></td></tr>').join("")
-    :'<tr><td colspan="6"><div class="empty">ยังไม่มีเอกสารแนบ — แนบได้จากปุ่ม 📎 ในแต่ละรายการ</div></td></tr>')+
-   '</tbody></table></div></div>';
+
+  /* กรอง */
+  let list=S.files.slice();
+  if(f.contract) list=list.filter(x=>x.refType===f.contract);
+  if(f.status)   list=list.filter(x=>(x.docType||"other")===f.status);
+  if(f.q){ const q=f.q.toLowerCase();
+    list=list.filter(x=>((x.name||"")+" "+refInfo(x).group+" "+refInfo(x).sub).toLowerCase().includes(q)); }
+
+  /* สรุปหัวหน้า */
+  const totalSize=S.files.reduce((s,x)=>s+Number(x.size||0),0);
+  const links=S.files.filter(x=>x.url).length;
+  const byType={}; S.files.forEach(x=>{const t=x.docType||"other"; byType[t]=(byType[t]||0)+1;});
+  const typeOptions=[...new Set(S.files.map(x=>x.docType||"other"))];
+  const refCounts={}; S.files.forEach(x=>{refCounts[x.refType]=(refCounts[x.refType]||0)+1;});
+
+  /* จัดกลุ่มตามรายการที่ผูก */
+  const groups=new Map();
+  list.forEach(x=>{
+    const info=refInfo(x);
+    if(!groups.has(info.key)) groups.set(info.key,{info,files:[]});
+    groups.get(info.key).files.push(x);
+  });
+  const order=["payment","extra","rfa","eot","contract"];
+  const sorted=[...groups.values()].sort((a,b)=>{
+    const ta=order.indexOf(a.files[0].refType), tb=order.indexOf(b.files[0].refType);
+    return ta-tb || a.info.group.localeCompare(b.info.group,"th");
+  });
+
+  const fileRow=x=>{
+    const m=docMeta(x.refType,x.docType||"other");
+    return '<div class="drow">'+
+      '<span class="dtype" title="'+esc(m[1])+'">'+esc(m[2])+'</span>'+
+      '<div class="dinfo"><div class="dname">'+esc(x.name)+'</div>'+
+      '<div class="dmeta">'+esc(m[1])+' · '+(x.url?"ลิงก์ภายนอก":bytes(x.size))+' · แนบเมื่อ '+thDate((x.createdAt||"").slice(0,10))+'</div></div>'+
+      '<div class="dacts"><button class="btn ghost sm" data-dl="'+x.id+'">เปิด</button>'+
+      '<button class="btn ghost sm" data-rmfile="'+x.id+'">ลบ</button></div></div>';
+  };
+
+  $("#view").innerHTML=
+    '<div class="grid kpis" style="margin-bottom:14px;grid-template-columns:repeat(auto-fit,minmax(235px,1fr))">'+
+      '<div class="kpi lead"><div class="lab">เอกสารทั้งหมด</div><div class="val">'+S.files.length+'<small>ไฟล์</small></div>'+
+      '<div class="note">ขนาดรวม '+bytes(totalSize)+(links?' · ลิงก์ภายนอก '+links+' รายการ':'')+'</div></div>'+
+      '<div class="kpi"><div class="lab">ผูกกับงวดงาน</div><div class="val">'+(refCounts.payment||0)+'<small>ไฟล์</small></div>'+
+      '<div class="note">ใบเบิก รายงาน และสลิปโอนเงิน</div></div>'+
+      '<div class="kpi"><div class="lab">สัญญา · งานเพิ่ม</div><div class="val">'+((refCounts.contract||0)+(refCounts.extra||0))+'<small>ไฟล์</small></div>'+
+      '<div class="note">เอกสารสัญญาและงานนอกสัญญา</div></div>'+
+      '<div class="kpi"><div class="lab">อนุมัติ · ขยายเวลา</div><div class="val">'+((refCounts.rfa||0)+(refCounts.eot||0))+'<small>ไฟล์</small></div>'+
+      '<div class="note">RFA และคำขอขยายระยะเวลา</div></div>'+
+    '</div>'+
+
+    '<div class="filters">'+
+      '<select data-filter="contract"><option value="">ทุกหมวด</option>'+
+        Object.keys(REF_LABEL).filter(k=>refCounts[k]).map(k=>'<option value="'+k+'"'+(f.contract===k?" selected":"")+'>'+
+          REF_LABEL[k]+' ('+refCounts[k]+')</option>').join("")+'</select>'+
+      '<select data-filter="status"><option value="">ทุกประเภทเอกสาร</option>'+
+        typeOptions.map(t=>{const anyF=S.files.find(x=>(x.docType||"other")===t);
+          return '<option value="'+t+'"'+(f.status===t?" selected":"")+'>'+esc(docMeta(anyF.refType,t)[1])+' ('+byType[t]+')</option>';}).join("")+'</select>'+
+      '<input type="search" data-filter="q" placeholder="ค้นหาชื่อไฟล์ / งวด / เลขที่เอกสาร" value="'+esc(f.q)+'">'+
+      (f.contract||f.status||f.q?'<button class="btn ghost sm" data-act="docs-clear">ล้างตัวกรอง</button>':'')+
+    '</div>'+
+
+    (S.files.length===0?
+      '<div class="card"><div class="empty" style="padding:60px 20px">ยังไม่มีเอกสารในระบบ<br>'+
+      '<span style="font-size:13px">แนบได้จากปุ่มในแต่ละรายการ หรือกด “นำเข้าเอกสารทั้งโฟลเดอร์” มุมขวาบนเพื่ออัปโหลดครั้งละหลายไฟล์</span></div></div>'
+     : sorted.length===0?
+      '<div class="card"><div class="empty">ไม่พบเอกสารตามเงื่อนไขที่เลือก</div></div>'
+     : sorted.map(g=>
+        '<div class="card docgroup"><div class="card-h">'+
+        '<div><h3>'+esc(g.info.group)+'</h3>'+(g.info.sub?'<div class="muted" style="font-size:12.5px">'+g.info.sub+'</div>':'')+'</div>'+
+        '<span class="hint">'+g.files.length+' ไฟล์ · '+
+        '<button class="btn ghost sm" data-files="'+g.info.key+'">จัดการเอกสาร</button></span></div>'+
+        '<div class="card-b" style="padding:6px 16px 12px">'+g.files.map(fileRow).join("")+'</div></div>').join(""));
+
+  if(S._focusQ){ const i=$('[data-filter="q"]'); if(i){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); } S._focusQ=false; }
 }
 
 /* ---------- setup ---------- */
@@ -1151,6 +1222,7 @@ document.addEventListener("click",async e=>{
     if(a==="imp-pick") $("#impFiles").click();
     if(a==="imp-folder") $("#impDir").click();
     if(a==="imp-run") runImport();
+    if(a==="docs-clear"){ S.filter={contract:"",status:"",q:""}; renderAll(); }
     if(a==="export-rfa") saveCSV("งานขออนุมัติ-มหาวิหารเก้าฟ้า.csv",rfaRows());
     if(a==="new-contract") editContract(null);
     if(a==="export-pay") saveCSV("งวดงาน-มหาวิหารเก้าฟ้า.csv",payRows());
