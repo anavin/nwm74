@@ -473,6 +473,36 @@ function viewDash(){
     '</div>'+
   '</div>'+
 
+  /* ============ งานขออนุมัติ ============ */
+  '<div class="card" style="margin-top:16px"><div class="card-h"><h3>งานขออนุมัติ (RFA)</h3>'+
+  '<span class="hint">เรียงตามความเร่งด่วน · <button class="btn ghost sm" data-view="rfa">ดูทั้งหมด</button></span></div>'+
+  '<div class="tablewrap"><table><thead><tr><th>หมวดงาน / เรื่อง</th><th>เลขที่เอกสาร</th><th>ยี่ห้อ / รุ่น</th>'+
+  '<th class="c">Lead time</th><th>ต้องอนุมัติภายใน</th><th>ยื่นเมื่อ</th><th class="c">สถานะ</th><th class="c">เอกสาร</th></tr></thead><tbody>'+
+  (S.rfas.length? [...S.rfas].sort((a,b)=>{
+      const rank={late:0,due:1,idle:2,paid:3};
+      const ra=rank[rfaState(a)], rb=rank[rfaState(b)];
+      if(ra!==rb) return ra-rb;
+      const da=rfaDeadline(a)||"9999", db=rfaDeadline(b)||"9999";
+      return da.localeCompare(db) || (a.order||0)-(b.order||0);
+    }).slice(0,8).map(r=>{
+      const st=rfaState(r), dl=rfaDeadline(r), today=new Date().toISOString().slice(0,10);
+      const lateDl = dl && dl<today && st!=="paid";
+      return '<tr><td data-l="หมวดงาน" class="stripe '+(st==="idle"?"":st)+'" style="min-width:220px">'+
+        '<div style="font-weight:600">'+esc(r.title||"—")+'</div>'+
+        '<div class="muted" style="font-size:12.5px">'+esc(r.trade||"")+' · '+esc(r.reviewer||"")+'</div></td>'+
+        '<td data-l="เลขที่เอกสาร" class="num">'+esc(r.docNo||"—")+'</td>'+
+        '<td data-l="ยี่ห้อ / รุ่น">'+(r.brand?esc(r.brand):'<span class="muted">—</span>')+'</td>'+
+        '<td data-l="Lead time" class="c num">'+(r.leadDays?r.leadDays+" วัน":'<span class="muted">—</span>')+'</td>'+
+        '<td data-l="ต้องอนุมัติภายใน" class="num"'+(lateDl?' style="color:var(--late);font-weight:600"':'')+'>'+
+          (dl?thDate(dl):'<span class="muted">ยังไม่กำหนดวันใช้งาน</span>')+'</td>'+
+        '<td data-l="ยื่นเมื่อ" class="num">'+(r.submitDate?thDate(r.submitDate):'<span class="muted">ยังไม่ยื่น</span>')+'</td>'+
+        '<td data-l="สถานะ" class="c"><span class="pill '+(st==="idle"?"info":st)+'">'+esc(r.status||"—")+'</span></td>'+
+        '<td data-l="เอกสาร" class="c"><div>'+docChip("rfa",r)+'</div></td></tr>';
+    }).join("")+
+    (S.rfas.length>8?'<tr><td colspan="8" class="muted" style="text-align:center">และอีก '+(S.rfas.length-8)+' รายการ — กด “ดูทั้งหมด” ที่หัวตาราง</td></tr>':'')
+   :'<tr><td colspan="8"><div class="empty">ยังไม่มีรายการขออนุมัติ</div></td></tr>')+
+  '</tbody></table></div></div>'+
+
   '<div class="card" style="margin-top:16px"><div class="card-h"><h3>ไทม์ไลน์สัญญาและการขยายเวลา</h3>'+
   '<span class="hint">อาคาร 3 ชั้น — บริษัท เอ พลัส แอสโซซิเอท จำกัด</span></div><div class="card-b">'+timelineHTML()+'</div></div>';
 }
