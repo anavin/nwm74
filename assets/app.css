@@ -296,6 +296,10 @@ td.c,th.c{text-align:center}
 .docslot header .btn+.btn{margin-left:6px}
 .docslot .filerow:last-child{border-bottom:0;padding-bottom:0}
 
+.notecard{border-color:var(--brass-line);background:var(--brass-soft)}
+.notecard .card-h{border-bottom-color:var(--brass-line)}
+.notecard .card-h:before{background:var(--brass)}
+.notecard .card-b{background:var(--surface);border-radius:0 0 var(--radius) var(--radius)}
 .ctr-terms{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);display:grid;gap:6px;font-size:13px}
 .ctr-terms div{display:flex;justify-content:space-between;gap:12px}
 .ctr-terms span{color:var(--ink-3)}

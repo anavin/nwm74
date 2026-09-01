@@ -335,19 +335,6 @@ function viewDash(){
   const overdueSum=overdue.reduce((s,r)=>s+r.amount,0);
   const maxAge=Math.max(30,...dueRows.map(r=>Math.abs(r.age||0)));
 
-  /* ---- เอกสารไม่ครบ ---- */
-  const gaps=[];
-  S.payments.forEach(p=>{const m=docState("payment",p).missing; if(m.length){const c=S.contracts.find(c=>c.id===p.contractId);
-    gaps.push({rt:"payment",id:p.id,title:(c?c.code+" · ":"")+"งวดที่ "+p.seq+" ("+(p.invoice||"—")+")",miss:missingLabel("payment",p)});}});
-  S.extras.forEach(x=>{const m=docState("extra",x).missing; if(m.length)
-    gaps.push({rt:"extra",id:x.id,title:"งานเพิ่ม · "+x.building,miss:missingLabel("extra",x)});});
-  S.eots.forEach(e=>{const m=docState("eot",e).missing; if(m.length)
-    gaps.push({rt:"eot",id:e.id,title:"ขยายเวลาครั้งที่ "+e.no+" ("+e.docNo+")",miss:missingLabel("eot",e)});});
-  S.contracts.forEach(c=>{const m=docState("contract",c).missing; if(m.length)
-    gaps.push({rt:"contract",id:c.id,title:"สัญญา · "+c.code,miss:missingLabel("contract",c)});});
-  S.rfas.forEach(r=>{const m=docState("rfa",r).missing; if(m.length)
-    gaps.push({rt:"rfa",id:r.id,title:"ขออนุมัติ · "+(r.title||""),miss:missingLabel("rfa",r)});});
-
   const kpi=(cls,lab,val,unit,note)=>'<div class="kpi '+cls+'"><div class="lab">'+lab+'</div><div class="val">'+val+
     (unit?'<small>'+unit+'</small>':'')+'</div><div class="note">'+(note||"")+'</div></div>';
 
@@ -414,7 +401,6 @@ function viewDash(){
       (waiting?" (รออนุมัติอีก "+waiting+" วัน)":""))+
     kpi(rfaLate.length?"bad":(rfaDue.length?"warn":""),"งานขออนุมัติ",S.rfas.length,"รายการ",
       "รอผล "+rfaDue.length+" · ต้องเร่ง "+rfaLate.length+" · อนุมัติแล้ว "+S.rfas.filter(r=>rfaState(r)==="paid").length)+
-    kpi(gaps.length?"warn":"","เอกสารไม่ครบ",gaps.length,"รายการ",gaps.length?"ดูรายละเอียดด้านล่าง":"เอกสารครบทุกรายการ")+
   '</div>'+
 
   /* ============ สองคอลัมน์ ============ */
@@ -462,14 +448,6 @@ function viewDash(){
          }).join("")) || '<div class="muted">ไม่มีงานค้างอนุมัติ</div>')+
       '</div></div>'+
 
-      '<div class="card"><div class="card-h"><h3>เอกสารไม่ครบ</h3>'+
-      '<span class="hint">'+gaps.length+' รายการ</span></div><div class="card-b" style="display:grid;gap:10px">'+
-      (gaps.length? gaps.slice(0,7).map(g=>
-        '<div class="tk"><button class="clip" data-files="'+g.rt+':'+g.id+'">แนบ</button>'+
-        '<div><div class="tk-t">'+esc(g.title)+'</div><div class="tk-s">ขาด: '+esc(g.miss)+'</div></div></div>').join("")+
-        (gaps.length>7?'<div class="muted" style="font-size:13.5px">และอีก '+(gaps.length-7)+' รายการ</div>':'')
-       : '<div class="muted">เอกสารครบทุกรายการ</div>')+
-      '</div></div>'+
     '</div>'+
   '</div>'+
 
@@ -532,7 +510,21 @@ function viewPay(){
   tools('<button class="btn" data-act="export-pay">ส่งออก CSV</button>'+
         '<button class="btn primary" data-act="new-pay">+ เพิ่มงวดงาน</button>');
   const f=S.filter;
-  const filterBar='<div class="filters">'+
+  /* แถบหมายเหตุ: งวดที่เอกสารยังไม่ครบ */
+  const gaps=S.payments.map(p=>({p,st:docState("payment",p)})).filter(g=>g.st.missing.length);
+  const gapBar = gaps.length? '<div class="card notecard" style="margin-bottom:14px">'+
+    '<div class="card-h"><h3>หมายเหตุ — เอกสารยังไม่ครบ '+gaps.length+' งวด</h3>'+
+    '<span class="hint">ยังไม่จ่าย: ต้องมีใบเบิก + รายงานงวดงาน · จ่ายแล้ว: ต้องมีสลิปโอนเงินด้วย</span></div>'+
+    '<div class="card-b" style="display:grid;gap:9px">'+
+      gaps.slice(0,10).map(g=>{
+        const c=contractOf(g.p);
+        return '<div class="tk"><button class="clip" data-files="payment:'+g.p.id+'">แนบ</button>'+
+          '<div><div class="tk-t">'+esc(c?c.code:"")+' · งวดที่ '+g.p.seq+' ('+esc(g.p.invoice||"—")+')</div>'+
+          '<div class="tk-s">ขาด: '+esc(missingLabel("payment",g.p))+'</div></div></div>';
+      }).join("")+
+      (gaps.length>10?'<div class="muted" style="font-size:13px">และอีก '+(gaps.length-10)+' งวด</div>':'')+
+    '</div></div>' : '';
+  const filterBar=gapBar+'<div class="filters">'+
     '<select data-filter="contract"><option value="">ทุกสัญญา</option>'+
       S.contracts.map(c=>'<option value="'+c.id+'"'+(f.contract===c.id?" selected":"")+'>'+esc(c.code)+'</option>').join("")+'</select>'+
     '<select data-filter="status"><option value="">ทุกสถานะ</option>'+
