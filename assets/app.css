@@ -436,3 +436,49 @@ td.c,th.c{text-align:center}
 @media(max-width:420px){
   .mb-sub{display:none}
 }
+
+/* ---------- คลิกจากหน้าภาพรวมไปหาเนื้อหา ---------- */
+.go{cursor:pointer;position:relative;transition:background .13s ease,border-color .13s ease}
+.go:focus-visible{outline:1.5px solid var(--accent);outline-offset:2px}
+/* ปุ่มข้อความแบบลิงก์ */
+.golink{background:none;border:0;padding:0;margin:0;text-align:left;cursor:pointer;
+  color:inherit;font-size:inherit;line-height:inherit;border-bottom:1px solid transparent}
+.golink{border-bottom:1px dotted color-mix(in srgb,currentColor 42%,transparent)}
+.golink:hover,.golink:focus-visible{border-bottom-style:solid;border-bottom-color:currentColor;color:var(--accent-ink)}
+.golink.strong{font-weight:600;display:inline-block}
+.hero-sub .golink{color:#C7D8EC;border-bottom-color:rgba(255,255,255,.28)}
+.hero-sub .golink:hover{color:#fff;border-bottom-color:#fff}
+.hero-sub .golink.warn{color:#FFB3A6;font-weight:600;border-bottom-color:rgba(255,179,166,.45)}
+.hero-sub .golink.warn:hover{color:#FFD2C9;border-bottom-color:#FFD2C9}
+/* KPI ที่คลิกได้ */
+.kpi.go:hover{background:var(--surface-2)}
+.kpi.go:after{content:"›";position:absolute;top:15px;right:16px;font-size:19px;line-height:1;
+  color:var(--ink-3);opacity:.42;transition:opacity .13s ease,transform .13s ease}
+.kpi.go{position:relative}
+.kpi.go:hover:after,.kpi.go:focus-visible:after{opacity:1;transform:translateX(2px);color:var(--accent)}
+/* แถบยอดค้างรายสัญญาในแผงหัว */
+.hs-row.go{border-radius:5px;padding:4px 8px;margin:-4px -8px}
+.hs-row.go:hover{background:rgba(255,255,255,.12)}
+.hs-row.go .hs-nm:after{content:" ›";opacity:.55}
+/* แถวความคืบหน้ารายสัญญา */
+.ctr-row.go{border-radius:var(--radius-sm);padding-left:10px;padding-right:34px;margin-left:-10px;margin-right:-10px}
+.ctr-row.go:hover{background:var(--surface-2)}
+.ctr-row.go:after{content:"›";position:absolute;top:18px;right:12px;font-size:19px;line-height:1;
+  color:var(--ink-3);opacity:.42;transition:opacity .13s ease}
+.ctr-row.go{position:relative}
+.ctr-row.go:hover:after,.ctr-row.go:focus-visible:after{opacity:1;color:var(--accent)}
+/* การ์ด "ต้องติดตาม" */
+.tk.go{border-radius:var(--radius-sm);padding:8px 28px 8px 10px;margin:-8px -10px;position:relative}
+.tk.go:after{content:"›";position:absolute;top:9px;right:10px;font-size:17px;line-height:1;
+  color:var(--ink-3);opacity:.4;transition:opacity .13s ease}
+.tk.go:hover{background:var(--surface-2)}
+.tk.go:hover:after,.tk.go:focus-visible:after{opacity:1;color:var(--accent)}
+/* ไทม์ไลน์ */
+.tl-item.go{border-radius:var(--radius-sm);padding-left:10px;margin-left:-10px}
+.tl-item.go:hover{background:var(--surface-2)}
+/* ไฮไลต์แถวปลายทางหลังคลิก */
+@keyframes flashrow{0%{background:var(--accent-soft)}60%{background:var(--accent-soft)}100%{background:transparent}}
+tr.flash>td{animation:flashrow 2.4s ease-out}
+tr.flash>td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+.card.flash{animation:flashrow 2.4s ease-out}
+@media(prefers-reduced-motion:reduce){tr.flash>td,.card.flash{animation:none;background:var(--accent-soft)}}

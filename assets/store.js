@@ -104,6 +104,14 @@ const Store = (() => {
     const {error} = await sb.from(table).upsert(row, {onConflict: "id"});
     if(error) throw error;
   }
+  /* แก้เฉพาะบางคอลัมน์ (UPDATE จริง ไม่ใช่ upsert)
+     ใช้ตอนไม่อยากส่งทุกคอลัมน์ เช่น ฐานข้อมูลยังไม่มีคอลัมน์ใหม่บางตัว */
+  async function patch(table, id, body){
+    const row = toRow(table, body);
+    delete row.id;
+    const {error} = await sb.from(table).update(row).eq("id", id);
+    if(error) throw error;
+  }
   async function remove(table, id){
     const {error} = await sb.from(table).delete().eq("id", id);
     if(error) throw error;
@@ -161,6 +169,6 @@ const Store = (() => {
     if(error) throw error;
   }
 
-  return {init, onAuth, signIn, signOut, loadAll, save, remove, subscribe, uploadFile, addLink, fileUrl, deleteFile,
+  return {init, onAuth, signIn, signOut, loadAll, save, patch, remove, subscribe, uploadFile, addLink, fileUrl, deleteFile,
           get client(){ return sb; }};
 })();

@@ -321,6 +321,26 @@ function renderAll(){
 }
 function tools(html){ $("#viewTools").innerHTML=html; }
 
+/* ---------- คลิกจากหน้าภาพรวมไปยังเนื้อหาจริง ----------
+   data-go="<view>"            เปิดหน้านั้น
+   data-go="<view>#<rt>:<id>"  เปิดหน้านั้นแล้วเลื่อนไปที่แถวนั้น พร้อมไฮไลต์
+   data-gc / data-gs / data-gq  ตั้งค่าตัวกรอง (สัญญา / สถานะ / คำค้น) */
+function goTo(view,opts){
+  opts=opts||{};
+  S.view=view;
+  S.filter={contract:opts.contract||"",status:opts.status||"",q:opts.q||""};
+  closeNav(); renderAll();
+  const key=opts.row||"";
+  if(!key){ window.scrollTo({top:0,behavior:"smooth"}); return; }
+  requestAnimationFrame(()=>{
+    const el=document.querySelector('[data-row="'+key+'"]');
+    if(!el){ window.scrollTo({top:0,behavior:"smooth"}); return; }
+    el.scrollIntoView({behavior:"smooth",block:"center"});
+    el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+    clearTimeout(goTo._t); goTo._t=setTimeout(()=>el.classList.remove("flash"),2600);
+  });
+}
+
 /* ---------- dashboard ---------- */
 function viewDash(){
   tools('<button class="btn" data-act="export-all">ส่งออก CSV ทั้งโครงการ</button>');
@@ -345,7 +365,8 @@ function viewDash(){
   const overdueSum=overdue.reduce((s,r)=>s+r.amount,0);
   const maxAge=Math.max(30,...dueRows.map(r=>Math.abs(r.age||0)));
 
-  const kpi=(cls,lab,val,unit,note)=>'<div class="kpi '+cls+'"><div class="lab">'+lab+'</div><div class="val">'+val+
+  const kpi=(cls,lab,val,unit,note,go)=>'<div class="kpi '+cls+(go?" go":"")+'"'+(go||"")+
+    (go?' role="button" tabindex="0"':'')+'><div class="lab">'+lab+'</div><div class="val">'+val+
     (unit?'<small>'+unit+'</small>':'')+'</div><div class="note">'+(note||"")+'</div></div>';
 
   $("#view").innerHTML =
@@ -354,17 +375,20 @@ function viewDash(){
     '<div class="hero-main">'+
       '<div class="hero-lab">ยอดค้างจ่าย ณ วันนี้</div>'+
       '<div class="hero-fig">'+money(dueTotal)+'<small>บาท</small></div>'+
-      '<div class="hero-sub">'+dueRows.length+' รายการที่เบิกแล้วยังไม่ได้โอน'+
-        (overdue.length?' · <b class="warn">เลยกำหนดจ่ายแล้ว '+overdue.length+' รายการ ('+money(overdueSum)+' บาท)</b>':' · ยังไม่มีรายการเลยกำหนด')+
+      '<div class="hero-sub">'+
+        '<button class="golink" data-go="pay" data-gs="due">'+dueRows.length+' รายการที่เบิกแล้วยังไม่ได้โอน</button>'+
+        (overdue.length?' · <button class="golink warn" data-go="pay" data-gs="late">เลยกำหนดจ่ายแล้ว '+overdue.length+
+          ' รายการ ('+money(overdueSum)+' บาท)</button>':' · ยังไม่มีรายการเลยกำหนด')+
       '</div>'+
     '</div>'+
     '<div class="hero-split">'+
       S.contracts.map(c=>{const st=contractStats(c); if(!st.due) return "";
-        return '<div class="hs-row"><span class="hs-nm">'+esc(c.code)+'</span>'+
+        return '<div class="hs-row go" role="button" tabindex="0" data-go="pay" data-gc="'+c.id+'" data-gs="due">'+
+          '<span class="hs-nm">'+esc(c.code)+'</span>'+
           '<span class="hs-bar"><i style="width:'+Math.round(st.due/Math.max(1,dueTotal)*100)+'%"></i></span>'+
           '<span class="hs-val num">'+money(st.due)+'</span></div>';}).join("")+
       (S.extras.filter(x=>!isPaid(x)).length?
-        '<div class="hs-row"><span class="hs-nm">งานเพิ่ม</span><span class="hs-bar"><i style="width:'+
+        '<div class="hs-row go" role="button" tabindex="0" data-go="extra"><span class="hs-nm">งานเพิ่ม</span><span class="hs-bar"><i style="width:'+
         Math.round(S.extras.filter(x=>!isPaid(x)).reduce((s,x)=>s+paidNet(x),0)/Math.max(1,dueTotal)*100)+
         '%"></i></span><span class="hs-val num">'+money(S.extras.filter(x=>!isPaid(x)).reduce((s,x)=>s+paidNet(x),0))+'</span></div>':'')+
       '<div class="hs-foot">รอบจ่ายเฉลี่ยที่ผ่านมา '+(lag==null?"—":lag+" วัน")+' หลังยื่นใบเบิก</div>'+
@@ -373,13 +397,16 @@ function viewDash(){
 
   /* ============ ตารางค้างจ่ายรายรายการ ============ */
   '<div class="card" style="margin-bottom:16px"><div class="card-h"><h3>รายการค้างจ่าย</h3>'+
-  '<span class="hint">เรียงตามความเร่งด่วน · สีแดงคือเลยกำหนดจ่ายแล้ว</span></div><div class="tablewrap">'+
+  '<span class="hint">คลิกชื่อรายการเพื่อไปที่งวดนั้น · <button class="btn ghost sm" data-go="pay">ดูงวดงานทั้งหมด</button></span>'+
+  '</div><div class="tablewrap">'+
   (dueRows.length?'<table><thead><tr><th>รายการ</th><th>เลขที่ใบเบิก</th><th>ยื่นเมื่อ</th>'+
     '<th>ครบกำหนดจ่าย</th><th>สถานะเวลา</th><th class="r">ยอดที่ต้องโอน</th><th class="c">เอกสาร</th><th></th></tr></thead><tbody>'+
     dueRows.map(r=>{
       const late=r.late;
+      const gv = r.rt==="payment" ? "pay" : "extra";
+      const gc = r.rt==="payment" ? ' data-gc="'+(r.rec.contractId||"")+'"' : "";
       return '<tr><td data-l="รายการ" class="stripe '+(late?"late":"due")+'" style="min-width:200px">'+
-        '<div style="font-weight:600">'+esc(r.who)+' · '+esc(r.what)+'</div>'+
+        '<button class="golink strong" data-go="'+gv+'#'+r.rt+':'+r.rec.id+'"'+gc+'>'+esc(r.who)+' · '+esc(r.what)+'</button>'+
         '<div class="muted" style="font-size:13px">'+esc((r.rec.detail||"").slice(0,70))+'</div></td>'+
         '<td data-l="เลขที่ใบเบิก" class="num">'+esc(r.invoice||"—")+'</td>'+
         '<td data-l="ยื่นเมื่อ" class="num">'+thDate(r.date)+'</td>'+
@@ -415,7 +442,7 @@ function viewDash(){
       const st=rfaState(r), dl=rfaDeadline(r), today=new Date().toISOString().slice(0,10);
       const lateDl = dl && dl<today && st!=="paid";
       return '<tr><td data-l="หมวดงาน" class="stripe '+(st==="idle"?"":st)+'" style="min-width:220px">'+
-        '<div style="font-weight:600">'+esc(r.title||"—")+'</div>'+
+        '<button class="golink strong" data-go="rfa#rfa:'+r.id+'">'+esc(r.title||"—")+'</button>'+
         '<div class="muted" style="font-size:12.5px">'+esc(r.trade||"")+' · '+esc(r.reviewer||"")+'</div></td>'+
         '<td data-l="เลขที่เอกสาร" class="num">'+esc(r.docNo||"—")+'</td>'+
         '<td data-l="ยี่ห้อ / รุ่น">'+(r.brand?esc(r.brand):'<span class="muted">—</span>')+'</td>'+
@@ -434,25 +461,31 @@ function viewDash(){
   /* ============ ตัวเลขรอง ============ */
   '<div class="grid kpis" style="margin-bottom:16px">'+
     kpi("lead","มูลค่าสัญญารวม",money(t.contract),"บาท",
-      "เนื้องาน "+money(t.base)+" + VAT · "+S.contracts.length+" สัญญา · งานเพิ่ม "+money(t.extra)+" บาท")+
+      "เนื้องาน "+money(t.base)+" + VAT · "+S.contracts.length+" สัญญา · งานเพิ่ม "+money(t.extra)+" บาท",
+      ' data-go="setup"')+
     kpi("","เบิกแล้วสะสม",money(t.billed+t.extra),"บาท",
-      "เนื้องานที่เบิกแล้ว "+(t.baseBilled/Math.max(1,t.base)*100).toFixed(1)+"% ของเนื้องานตามสัญญา")+
-    kpi("","จ่ายแล้ว",money(t.paid+t.extraPaid),"บาท","เงินประกันผลงานที่หักไว้แล้ว "+money(t.retention||0)+" บาท")+
+      "เนื้องานที่เบิกแล้ว "+(t.baseBilled/Math.max(1,t.base)*100).toFixed(1)+"% ของเนื้องานตามสัญญา",
+      ' data-go="pay"')+
+    kpi("","จ่ายแล้ว",money(t.paid+t.extraPaid),"บาท","เงินประกันผลงานที่หักไว้แล้ว "+money(t.retention||0)+" บาท",
+      ' data-go="pay" data-gs="paid"')+
     kpi(left<90?"bad":"","กำหนดแล้วเสร็จ",thDate(end),"",
       (left>=0?"เหลืออีก "+left+" วัน":"เลยกำหนด "+Math.abs(left)+" วัน")+" · ขยายแล้ว "+approved+" วัน"+
-      (waiting?" (รออนุมัติอีก "+waiting+" วัน)":""))+
+      (waiting?" (รออนุมัติอีก "+waiting+" วัน)":""),
+      ' data-go="eot"')+
     kpi(rfaLate.length?"bad":(rfaDue.length?"warn":""),"งานขออนุมัติ",S.rfas.length,"รายการ",
-      "รอผล "+rfaDue.length+" · ต้องเร่ง "+rfaLate.length+" · อนุมัติแล้ว "+S.rfas.filter(r=>rfaState(r)==="paid").length)+
+      "รอผล "+rfaDue.length+" · ต้องเร่ง "+rfaLate.length+" · อนุมัติแล้ว "+S.rfas.filter(r=>rfaState(r)==="paid").length,
+      ' data-go="rfa"')+
   '</div>'+
 
   /* ============ สองคอลัมน์ ============ */
   '<div class="grid" style="grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);align-items:start">'+
     '<div class="card"><div class="card-h"><h3>ความคืบหน้าการเบิกจ่ายรายสัญญา</h3>'+
-      '<span class="hint">สัดส่วนของมูลค่าสัญญา</span></div><div class="card-b">'+
+      '<span class="hint">คลิกสัญญาเพื่อดูงวดของสัญญานั้น · <button class="btn ghost sm" data-go="setup">ข้อมูลสัญญา</button></span></div><div class="card-b">'+
       S.contracts.map(c=>{
         const st=contractStats(c), amt=Math.max(1,contractTotal(c));
         const wp=Math.min(100,st.paid/amt*100), wd=Math.min(100,st.due/amt*100);
-        return '<div class="ctr-row"><div class="ctr-head"><div><div class="nm">'+esc(c.code)+' — '+esc(c.name)+'</div>'+
+        return '<div class="ctr-row go" role="button" tabindex="0" data-go="pay" data-gc="'+c.id+'">'+
+          '<div class="ctr-head"><div><div class="nm">'+esc(c.code)+' — '+esc(c.name)+'</div>'+
           '<div class="who">'+esc(c.contractor)+'</div></div>'+
           '<div class="num" style="font-weight:600">'+money(contractTotal(c))+
           ' <span class="muted" style="font-weight:400">บาท'+(c.vat?" (รวม VAT)":"")+'</span></div></div>'+
@@ -470,21 +503,23 @@ function viewDash(){
     '</div></div>'+
 
     '<div style="display:grid;gap:14px">'+
-      '<div class="card"><div class="card-h"><h3>ต้องติดตาม</h3><span class="hint">งานอนุมัติและเวลา</span></div>'+
+      '<div class="card"><div class="card-h"><h3>ต้องติดตาม</h3>'+
+      '<span class="hint">คลิกเพื่อไปที่รายการนั้น</span></div>'+
       '<div class="card-b" style="display:grid;gap:12px">'+
         (S.payments.filter(p=>!isPaid(p)&&!p.certDate&&inspectDueOf(p)&&daysBetween(inspectDueOf(p))>0).slice(0,3).map(p=>{
         const c=contractOf(p), n=daysBetween(inspectDueOf(p));
-        return '<div class="tk"><span class="pill late">ตรวจช้า '+n+' วัน</span>'+
+        return '<div class="tk go" role="button" tabindex="0" data-go="pay#payment:'+p.id+'" data-gc="'+(p.contractId||"")+'">'+
+          '<span class="pill late">ตรวจช้า '+n+' วัน</span>'+
           '<div><div class="tk-t">รอ CM รับรองผลตรวจ · '+esc(p.invoice||"")+'</div>'+
           '<div class="tk-s">'+esc(c?c.code:"")+' งวดที่ '+p.seq+' · ครบกำหนดตรวจ '+thDate(inspectDueOf(p))+'</div></div></div>';
       }).join(""))+
       ((S.eots.filter(e=>e.status==="รออนุมัติ").map(e=>
-          '<div class="tk"><span class="pill due">รออนุมัติ</span>'+
+          '<div class="tk go" role="button" tabindex="0" data-go="eot#eot:'+e.id+'"><span class="pill due">รออนุมัติ</span>'+
           '<div><div class="tk-t">ขอขยายเวลาครั้งที่ '+e.no+' · '+esc(e.docNo)+'</div>'+
           '<div class="tk-s">ยื่น '+thDate(e.submitDate)+' · ขอ '+e.days+' วัน · ค้าง '+(daysBetween(e.submitDate)||0)+' วันแล้ว</div></div></div>').join("")+
          rfaLate.concat(rfaDue).slice(0,4).map(r=>{
           const st=rfaState(r), dl=rfaDeadline(r);
-          return '<div class="tk"><span class="pill '+st+'">'+(st==="late"?"ต้องเร่ง":"รออนุมัติ")+'</span>'+
+          return '<div class="tk go" role="button" tabindex="0" data-go="rfa#rfa:'+r.id+'"><span class="pill '+st+'">'+(st==="late"?"ต้องเร่ง":"รออนุมัติ")+'</span>'+
             '<div><div class="tk-t">'+esc(r.title||"")+(r.docNo?' · '+esc(r.docNo):'')+'</div>'+
             '<div class="tk-s">'+esc(r.trade||"")+(dl?' · ต้องอนุมัติภายใน '+thDate(dl):'')+'</div></div></div>';
          }).join("")) || '<div class="muted">ไม่มีงานค้างอนุมัติ</div>')+
@@ -494,7 +529,9 @@ function viewDash(){
   '</div>'+
 
   '<div class="card" style="margin-top:16px"><div class="card-h"><h3>ไทม์ไลน์สัญญาและการขยายเวลา</h3>'+
-  '<span class="hint">อาคาร 3 ชั้น — บริษัท เอ พลัส แอสโซซิเอท จำกัด</span></div><div class="card-b">'+timelineHTML()+'</div></div>';
+  '<span class="hint">อาคาร 3 ชั้น — บริษัท เอ พลัส แอสโซซิเอท จำกัด<br>'+
+  '<button class="btn ghost sm" data-go="eot">ดูคำขอขยายเวลาทั้งหมด</button></span></div>'+
+  '<div class="card-b">'+timelineHTML()+'</div></div>';
 }
 function timelineHTML(){
   const items=[];
@@ -505,13 +542,14 @@ function timelineHTML(){
   S.eots.forEach(e=>{
     items.push({d:e.submitDate,t:"ยื่นขอขยายเวลาครั้งที่ "+e.no+" ("+e.docNo+")",
       b:"ขอ "+e.days+" วัน · "+e.status+(e.decisionDate?" "+thDate(e.decisionDate):"" )+" → สิ้นสุด "+thDate(e.newEnd),
-      k:e.status==="อนุมัติแล้ว"?"done":"pending"});
+      k:e.status==="อนุมัติแล้ว"?"done":"pending", go:e.id});
     items.push({d:e.newEnd,t:"กำหนดแล้วเสร็จหลังขยายครั้งที่ "+e.no,
       b:thDateFull(e.oldEnd)+" + "+e.days+" วัน"+(e.status==="รออนุมัติ"?" (ยังไม่ยืนยัน)":""),
-      k:e.status==="อนุมัติแล้ว"?"done":"pending"});
+      k:e.status==="อนุมัติแล้ว"?"done":"pending", go:e.id});
   });
   items.sort((a,b)=>(a.d||"").localeCompare(b.d||""));
-  return '<div class="tl">'+items.map(i=>'<div class="tl-item '+i.k+'"><div class="tl-date">'+thDateFull(i.d)+'</div>'+
+  return '<div class="tl">'+items.map(i=>'<div class="tl-item '+i.k+(i.go?" go":"")+'"'+
+    (i.go?' role="button" tabindex="0" data-go="eot#eot:'+i.go+'"':'')+'><div class="tl-date">'+thDateFull(i.d)+'</div>'+
     '<div class="tl-title">'+esc(i.t)+'</div><div class="tl-body">'+esc(i.b)+'</div></div>').join("")+'</div>';
 }
 
@@ -559,7 +597,7 @@ function viewPay(){
       '<th>วันที่โอน</th><th class="c">สถานะ</th><th class="c">เอกสาร</th><th></th></tr></thead><tbody>'+
       rows.map(p=>{
         const st=pstatus(p), age=daysBetween(p.reqDate), n=filesFor("payment",p.id).length;
-        return '<tr><td data-l="งวดที่" class="c stripe '+st+' num">'+p.seq+'</td>'+
+        return '<tr data-row="payment:'+p.id+'"><td data-l="งวดที่" class="c stripe '+st+' num">'+p.seq+'</td>'+
           '<td data-l="รายละเอียดงาน" style="min-width:250px">'+esc(p.detail)+(p.note?'<div class="muted" style="font-size:13px">'+esc(p.note)+'</div>':'')+'</td>'+
           '<td data-l="มูลค่างวด" class="r num">'+money(p.amount)+'</td><td data-l="VAT" class="r num">'+(p.vat?money(p.vat):'<span class="muted">—</span>')+'</td>'+
           '<td data-l="หักประกัน" class="r num">'+(p.retention?money(p.retention):'<span class="muted">—</span>')+'</td>'+
@@ -594,7 +632,7 @@ function viewExtra(){
     '<th class="c">สถานะ</th><th class="c">เอกสาร</th><th></th></tr></thead><tbody>'+
     (S.extras.length?S.extras.map(x=>{
       const st=pstatus(x), n=filesFor("extra",x.id).length;
-      return '<tr><td data-l="อาคาร" class="stripe '+st+'">'+esc(x.building)+'</td>'+
+      return '<tr data-row="extra:'+x.id+'"><td data-l="อาคาร" class="stripe '+st+'">'+esc(x.building)+'</td>'+
         '<td data-l="รายละเอียดงาน" style="min-width:260px">'+esc(x.detail)+(x.note?'<div class="muted" style="font-size:13px">'+esc(x.note)+'</div>':'')+'</td>'+
         '<td data-l="มูลค่างาน" class="r num">'+money(x.amount)+'</td><td data-l="ส่วนลด" class="r num">'+(x.discount?money(x.discount):'<span class="muted">—</span>')+'</td>'+
         '<td data-l="ยอดจ่ายจริง" class="r num" style="font-weight:600">'+money(paidNet(x))+'</td>'+
@@ -649,7 +687,7 @@ function viewRfa(){
   (rows.length? rows.map(r=>{
     const st=rfaState(r), dl=rfaDeadline(r), n=filesFor("rfa",r.id).length;
     const lateDl = dl && dl<today && st!=="paid";
-    return '<tr><td data-l="หมวดงาน" class="stripe '+(st==="idle"?"":st)+'" style="min-width:230px">'+
+    return '<tr data-row="rfa:'+r.id+'"><td data-l="หมวดงาน" class="stripe '+(st==="idle"?"":st)+'" style="min-width:230px">'+
       '<div style="font-weight:600">'+esc(r.title||"—")+'</div>'+
       '<div class="muted" style="font-size:13.5px">'+esc(r.detail||"")+'</div>'+
       (r.note?'<div class="muted" style="font-size:13px">'+esc(r.note)+'</div>':'')+'</td>'+
@@ -683,7 +721,7 @@ function viewEot(){
   const rows=S.eots.map(e=>{
     acc+=Number(e.days||0);
     const n=filesFor("eot",e.id).length, ok=e.status==="อนุมัติแล้ว";
-    return '<tr><td data-l="ครั้งที่" class="c stripe '+(ok?"paid":"due")+' num" style="font-weight:600">'+e.no+'</td>'+
+    return '<tr data-row="eot:'+e.id+'"><td data-l="ครั้งที่" class="c stripe '+(ok?"paid":"due")+' num" style="font-weight:600">'+e.no+'</td>'+
       '<td data-l="เหตุผล / สาเหตุ" style="min-width:300px">'+esc(e.reason)+(e.note?'<div class="muted" style="font-size:13px">'+esc(e.note)+'</div>':'')+'</td>'+
       '<td data-l="เลขที่เอกสาร" class="num">'+esc(e.docNo)+'</td>'+
       '<td data-l="วันที่ยื่น" class="num">'+thDate(e.submitDate)+
@@ -1185,7 +1223,8 @@ function openFiles(refType,refId){
   $("#flist").addEventListener("change",async e=>{
     const sel=e.target.closest("[data-ftype]"); if(!sel) return;
     const f=S.files.find(x=>x.id===sel.dataset.ftype); if(!f) return;
-    try{ await Store.save(COLS.files, f.id, Object.assign({}, f, {docType:sel.value})); await refresh();
+    /* ส่งเฉพาะคอลัมน์ที่แก้ เพื่อไม่ให้ติดคอลัมน์ที่ยังไม่มีในฐานข้อมูล */
+    try{ await Store.patch(COLS.files, f.id, {docType:sel.value}); await refresh();
       toast("เปลี่ยนประเภทเป็น "+docMeta(refType,sel.value)[1]); openFiles(refType,refId); }
     catch(err){ toast("เปลี่ยนประเภทไม่สำเร็จ: "+(err.message||err)); }
   });
@@ -1235,8 +1274,13 @@ function allRows(){
 document.addEventListener("click",async e=>{
   if(e.target.closest("button[data-close]")){ closeOverlay(); return; }
   if(e.target.classList && e.target.classList.contains("scrim")){ closeOverlay(); return; }
-  const t=e.target.closest("[data-view],[data-act],[data-edit],[data-del],[data-files],[data-dl],[data-rmfile]");
+  const t=e.target.closest("[data-go],[data-view],[data-act],[data-edit],[data-del],[data-files],[data-dl],[data-rmfile]");
   if(!t) return;
+  if(t.dataset.go){
+    const [view,row]=t.dataset.go.split("#");
+    goTo(view,{contract:t.dataset.gc||"",status:t.dataset.gs||"",q:t.dataset.gq||"",row:row||""});
+    return;
+  }
   if(t.dataset.view){ S.view=t.dataset.view; S.filter={contract:"",status:"",q:""}; closeNav(); renderAll(); window.scrollTo({top:0}); return; }
   if(t.dataset.act){
     const a=t.dataset.act;
@@ -1266,6 +1310,11 @@ document.addEventListener("click",async e=>{
   if(t.dataset.files){ const [rt,rid]=t.dataset.files.split(":"); openFiles(rt,rid); return; }
   if(t.dataset.dl){ const f=S.files.find(x=>x.id===t.dataset.dl); if(f) downloadFile(f); return; }
   if(t.dataset.rmfile){ const f=S.files.find(x=>x.id===t.dataset.rmfile); if(f){ await deleteFile(f); if(openFiles._render) openFiles._render(); } return; }
+});
+document.addEventListener("keydown",e=>{
+  if(e.key!=="Enter"&&e.key!==" ") return;
+  const g=e.target.closest('[data-go][role="button"]'); if(!g) return;
+  e.preventDefault(); g.click();
 });
 document.addEventListener("change",e=>{
   const im=e.target.closest("[data-imp]");
