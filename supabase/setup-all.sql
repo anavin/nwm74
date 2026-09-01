@@ -122,6 +122,28 @@ create policy activity_write on nm74.activity
 -- ไม่มี policy update/delete = แก้ย้อนหลังหรือลบประวัติจากหน้าเว็บไม่ได้
 
 
+-- ---------- 3.1 เฉพาะแอดมินเท่านั้นที่อ่านประวัติและรายชื่อผู้ใช้ได้ ----------
+create or replace function nm74.is_admin() returns boolean
+language sql security definer stable
+set search_path = nm74, public
+as $fn$
+  select exists (select 1 from nm74.members where user_id = auth.uid() and role = 'admin');
+$fn$;
+
+revoke all on function nm74.is_admin() from public;
+grant execute on function nm74.is_admin() to authenticated, service_role;
+
+drop policy if exists activity_read on nm74.activity;
+create policy activity_read on nm74.activity
+  for select to authenticated using (nm74.is_admin());
+
+--  แถวตัวเองต้องอ่านได้ ไม่งั้นระบบเช็คสิทธิ์ตอนล็อกอินไม่ได้
+drop policy if exists members_read on nm74.members;
+create policy members_read on nm74.members
+  for select to authenticated
+  using (user_id = auth.uid() or nm74.is_admin());
+
+
 -- ---------- สิทธิ์ของตารางใหม่ ----------
 grant usage on schema nm74 to anon, authenticated, service_role;
 grant all on all tables    in schema nm74 to authenticated, service_role;

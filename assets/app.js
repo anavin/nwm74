@@ -1151,14 +1151,18 @@ function viewUsers(){
       '<td data-l="เพิ่มเมื่อ" class="num">'+thDate(String(m.createdAt||"").slice(0,10))+'</td>'+
       '<td data-l="หมายเหตุ" style="font-size:13.5px">'+(m.note?esc(m.note):'<span class="muted">—</span>')+'</td>'+
       '<td><div class="rowacts">'+
+        '<button class="btn ghost sm" data-usrlog="'+esc(m.userId)+'">ประวัติ</button>'+
         '<button class="btn ghost sm" data-usredit="'+esc(m.userId)+'">แก้ไข</button>'+
         (isMe?'':'<button class="btn ghost sm" data-usrdel="'+esc(m.userId)+'">ลบ</button>')+
       '</div></td></tr>';
   }).join("") : '<tr><td colspan="7"><div class="empty">ยังไม่มีผู้ใช้ในระบบ</div></td></tr>')+
   '</tbody></table></div></div>'+
   /* ============ ประวัติการใช้งาน ============ */
-  '<div class="card" style="margin-top:16px"><div class="card-h"><h3>ประวัติการใช้งาน</h3>'+
-  '<span class="hint">'+(S.acts||[]).length+' รายการล่าสุด · เรียงจากใหม่ไปเก่า</span></div>'+
+  '<div class="card" id="actcard" style="margin-top:16px"><div class="card-h">'+
+  '<h3>ประวัติการใช้งาน'+(function(){ const w=rows.find(m=>m.userId===S.actUser);
+    return w ? ' · '+esc(w.name||w.username) : ""; })()+'</h3>'+
+  '<span class="hint">'+(S.acts||[]).length+' รายการล่าสุด · เรียงจากใหม่ไปเก่า'+
+  (S.actUser?' · <button class="btn ghost sm" data-act="act-all">ดูของทุกคน</button>':'')+'</span></div>'+
   (S.actErr ? '<div class="card-b muted" style="line-height:1.7">'+esc(S.actErr)+'</div>' :
   '<div class="card-b" style="padding-bottom:0"><div class="filters">'+
     '<select data-actuser><option value="">ทุกคน</option>'+
@@ -1488,7 +1492,7 @@ document.addEventListener("touchstart", e=>{ downOnScrim=isScrim(e.target); }, t
 document.addEventListener("click",async e=>{
   if(e.target.closest("button[data-close]")){ tryClose(); return; }
   if(isScrim(e.target)){ if(downOnScrim) tryClose(); return; }
-  const t=e.target.closest("[data-go],[data-view],[data-act],[data-edit],[data-del],[data-files],[data-dl],[data-rmfile],[data-usredit],[data-usrdel]");
+  const t=e.target.closest("[data-go],[data-view],[data-act],[data-edit],[data-del],[data-files],[data-dl],[data-rmfile],[data-usrlog],[data-usredit],[data-usrdel]");
   if(!t) return;
   if(t.dataset.go){
     const [view,row]=t.dataset.go.split("#");
@@ -1513,6 +1517,7 @@ document.addEventListener("click",async e=>{
     if(a==="export-rfa") saveCSV("งานขออนุมัติ-มหาวิหารเก้าฟ้า.csv",rfaRows());
     if(a==="new-contract") editContract(null);
     if(a==="new-user") editUser(null);
+    if(a==="act-all"){ S.actUser=""; await loadMembers(); renderAll(); }
     if(a==="export-pay") saveCSV("งวดงาน-มหาวิหารเก้าฟ้า.csv",payRows());
     if(a==="export-all") saveCSV("สรุปโครงการ-มหาวิหารเก้าฟ้า.csv",allRows());
     return;
@@ -1525,6 +1530,11 @@ document.addEventListener("click",async e=>{
     const [k,id]=t.dataset.del.split(":");
     if(!confirm("ลบรายการนี้? เอกสารแนบจะยังอยู่ในคลังเอกสาร")) return;
     await remove({pay:COLS.payments,extra:COLS.extras,rfa:COLS.rfas,eot:COLS.eots}[k],id); toast("ลบแล้ว"); return;
+  }
+  if(t.dataset.usrlog){
+    S.actUser = t.dataset.usrlog; await loadMembers(); renderAll();
+    const c=$("#actcard"); if(c) c.scrollIntoView({behavior:"smooth",block:"start"});
+    return;
   }
   if(t.dataset.usredit){ editUser(t.dataset.usredit); return; }
   if(t.dataset.usrdel){ await delUser(t.dataset.usrdel); return; }
