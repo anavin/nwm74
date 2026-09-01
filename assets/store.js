@@ -181,6 +181,41 @@ const Store = (() => {
     if(error) throw error;
   }
 
-  return {init, onAuth, signIn, signOut, displayName, loadAll, save, patch, remove, subscribe, uploadFile, addLink, fileUrl, deleteFile,
+  /* ---------------- จัดการผู้ใช้ (เรียก API ฝั่งเซิร์ฟเวอร์) ----------------
+     คีย์ service_role อยู่ที่ Vercel เท่านั้น เบราว์เซอร์ไม่เคยเห็น
+     ที่ส่งไปคือ access token ของคนที่ล็อกอินอยู่ ให้เซิร์ฟเวอร์ตรวจว่าเป็นแอดมินจริง */
+  async function api(method, body){
+    const {data} = await sb.auth.getSession();
+    const token = data && data.session && data.session.access_token;
+    if(!token) throw new Error("เซสชันหมดอายุ กรุณาล็อกอินใหม่");
+    const res = await fetch("/api/users", {
+      method,
+      headers: {"Content-Type":"application/json", Authorization: "Bearer "+token},
+      body: method === "GET" ? undefined : JSON.stringify(body || {})
+    });
+    let out = null;
+    try{ out = await res.json(); }catch(e){ out = null; }
+    if(!res.ok) throw new Error((out && out.error) || ("เรียก API ไม่สำเร็จ ("+res.status+")"));
+    return out;
+  }
+  const listMembers   = ()   => api("GET");
+  const createMember  = (b)  => api("POST", b);
+  const updateMember  = (b)  => api("PATCH", b);
+  const deleteMember  = (id) => api("DELETE", {userId:id});
+
+  /* role ของคนที่ล็อกอินอยู่ — ใช้ซ่อน/แสดงเมนูผู้ใช้งาน */
+  async function myRole(){
+    try{
+      const {data} = await sb.auth.getUser();
+      const uid = data && data.user && data.user.id;
+      if(!uid) return "";
+      const r = await sb.from("members").select("role").eq("user_id", uid).maybeSingle();
+      return (r.data && r.data.role) || "member";
+    }catch(e){ return ""; }   /* ยังไม่ได้สร้างตาราง members = ไม่มีระบบสมาชิก */
+  }
+
+  return {init, onAuth, signIn, signOut, displayName, myRole,
+          listMembers, createMember, updateMember, deleteMember,
+          loadAll, save, patch, remove, subscribe, uploadFile, addLink, fileUrl, deleteFile,
           get client(){ return sb; }};
 })();

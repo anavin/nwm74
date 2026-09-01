@@ -38,7 +38,7 @@ const RFA_STATUS = ["ยังไม่ยื่น","รออนุมัต�
 /* ============================ state ============================ */
 const S = {db:null, dl:null, mode:"local", view:"dash",
            contracts:[], payments:[], extras:[], eots:[], rfas:[], files:[],
-           filter:{contract:"", status:"", q:""}, seeded:false};
+           filter:{contract:"", status:"", q:""}, seeded:false, role:"", members:[], me:""};
 
 const COLS = {contracts:"contracts", payments:"payments", extras:"extras", eots:"eot", rfas:"rfa", files:"files"};
 function addDays(iso,d){ if(!iso) return ""; const x=new Date(iso+"T00:00:00"); if(isNaN(x)) return "";
@@ -163,7 +163,9 @@ async function boot(){
   Store.onAuth(async session=>{
     if(!session){ showLogin(); return; }
     hideLogin();
-    $("#dbstate").innerHTML = "เข้าสู่ระบบ: " + esc(Store.displayName(session.user.email||"")) ;
+    S.role = await Store.myRole();
+    $("#dbstate").innerHTML = "เข้าสู่ระบบ: " + esc(Store.displayName(session.user.email||"")) +
+      (S.role==="admin" ? ' <span class="rolechip">แอดมิน</span>' : "");
     await refresh();
     Store.subscribe(()=>refresh());
   });
@@ -305,23 +307,27 @@ const VIEWS=[
   {id:"import",label:"นำเข้าเอกสาร", sub:"เลือกทั้งโฟลเดอร์แล้วให้ระบบจับคู่ไฟล์กับงวดงาน สัญญา และรายการอนุมัติให้อัตโนมัติ"},
   {id:"docs",  label:"คลังเอกสาร", sub:"เอกสารแนบทั้งหมดของโครงการ"},
   {id:"extra", label:"งานเพิ่ม (นอกสัญญา)", sub:"งานที่เกิดขึ้นนอกเหนือสัญญาและใบเบิกที่เกี่ยวข้อง"},
-  {id:"setup", label:"สัญญาและผู้รับจ้าง", sub:"ข้อมูลสัญญา มูลค่า เงื่อนไข และบัญชีรับเงิน"}
+  {id:"setup", label:"สัญญาและผู้รับจ้าง", sub:"ข้อมูลสัญญา มูลค่า เงื่อนไข และบัญชีรับเงิน"},
+  {id:"users", label:"ผู้ใช้งาน", sub:"เพิ่มผู้ใช้ ตั้งรหัสผ่าน และกำหนดสิทธิ์ — เห็นเฉพาะแอดมิน", admin:true}
 ];
+const visibleViews = () => VIEWS.filter(v=>!v.admin || S.role==="admin");
 function renderNav(){
-  const counts={pay:S.payments.length,extra:S.extras.length,rfa:S.rfas.length,eot:S.eots.length,docs:S.files.length,setup:S.contracts.length};
-  $("#nav").innerHTML = VIEWS.map(v=>
+  const counts={pay:S.payments.length,extra:S.extras.length,rfa:S.rfas.length,eot:S.eots.length,docs:S.files.length,
+                setup:S.contracts.length,users:(S.members||[]).length};
+  $("#nav").innerHTML = visibleViews().map(v=>
     '<button class="navitem" data-view="'+v.id+'" aria-current="'+(S.view===v.id)+'">'+
     '<span class="dot"></span>'+esc(v.label)+
     (counts[v.id]!=null?'<span class="badge num">'+counts[v.id]+'</span>':'')+'</button>').join("");
 }
 function renderAll(){
+  if(!visibleViews().some(x=>x.id===S.view)) S.view="dash";
   const v=VIEWS.find(x=>x.id===S.view)||VIEWS[0];
   renderNav();
   $("#viewTitle").textContent=v.label; $("#viewSub").textContent=v.sub;
   const mb=$("#mbView"); if(mb) mb.textContent=v.label;
   $("#banner").innerHTML = S.mode==="db" ? "" :
     '<div class="banner">กำลังเชื่อมต่อฐานข้อมูล…</div>';
-  ({dash:viewDash,pay:viewPay,extra:viewExtra,rfa:viewRfa,eot:viewEot,import:viewImport,docs:viewDocs,setup:viewSetup}[S.view]||viewDash)();
+  ({dash:viewDash,pay:viewPay,extra:viewExtra,rfa:viewRfa,eot:viewEot,import:viewImport,docs:viewDocs,setup:viewSetup,users:viewUsers}[S.view]||viewDash)();
 }
 function tools(html){ $("#viewTools").innerHTML=html; }
 
@@ -1041,6 +1047,87 @@ function viewSetup(){
     }).join("")+'</div>';
 }
 
+/* ---------- ผู้ใช้งาน (เฉพาะแอดมิน) ---------- */
+async function loadMembers(){
+  try{ const r = await Store.listMembers(); S.members = r.members||[]; S.me = r.me||""; S.usersErr=""; }
+  catch(e){ S.members=[]; S.usersErr = e.message||"โหลดรายชื่อไม่สำเร็จ"; }
+}
+function viewUsers(){
+  tools('<button class="btn primary" data-act="new-user">+ เพิ่มผู้ใช้</button>');
+  const rows = S.members||[];
+  const admins = rows.filter(m=>m.role==="admin").length;
+
+  if(S.usersErr){
+    $("#view").innerHTML =
+      '<div class="card notecard"><div class="card-h"><h3>ยังใช้งานหน้านี้ไม่ได้</h3></div>'+
+      '<div class="card-b" style="line-height:1.75">'+
+      '<p style="margin:0 0 10px">'+esc(S.usersErr)+'</p>'+
+      '<p class="muted" style="margin:0">ตรวจ 2 อย่างนี้ครับ<br>'+
+      '1. รัน <b>supabase/migration-2026-09-members.sql</b> ใน Supabase แล้วหรือยัง<br>'+
+      '2. ตั้ง <b>SUPABASE_URL</b> และ <b>SUPABASE_SERVICE_ROLE_KEY</b> ใน Vercel → Settings → Environment Variables '+
+      'แล้ว deploy ใหม่หนึ่งครั้งหรือยัง</p></div></div>';
+    return;
+  }
+
+  $("#view").innerHTML =
+  '<div class="card"><div class="card-h"><h3>ผู้ใช้งานระบบ</h3>'+
+  '<span class="hint"><b>'+rows.length+'</b> คน · แอดมิน <b>'+admins+'</b></span></div>'+
+  '<div class="tablewrap"><table><thead><tr><th>ชื่อผู้ใช้</th><th>ชื่อ-สกุล</th>'+
+  '<th class="c">สิทธิ์</th><th>เข้าล่าสุด</th><th>เพิ่มเมื่อ</th><th>หมายเหตุ</th><th></th></tr></thead><tbody>'+
+  (rows.length? rows.map(m=>{
+    const isMe = m.userId===S.me;
+    return '<tr data-row="user:'+esc(m.userId)+'">'+
+      '<td data-l="ชื่อผู้ใช้" class="stripe '+(m.role==="admin"?"paid":"")+' num" style="font-weight:600">'+
+        esc(m.username)+(isMe?' <span class="muted" style="font-weight:400;font-size:12.5px">(คุณ)</span>':'')+'</td>'+
+      '<td data-l="ชื่อ-สกุล">'+(m.name?esc(m.name):'<span class="muted">—</span>')+'</td>'+
+      '<td data-l="สิทธิ์" class="c"><span class="pill '+(m.role==="admin"?"paid":"info")+'">'+
+        (m.role==="admin"?"แอดมิน":"ผู้ใช้ทั่วไป")+'</span></td>'+
+      '<td data-l="เข้าล่าสุด" class="num">'+(m.lastSignIn?thDate(String(m.lastSignIn).slice(0,10)):'<span class="muted">ยังไม่เคยเข้า</span>')+'</td>'+
+      '<td data-l="เพิ่มเมื่อ" class="num">'+thDate(String(m.createdAt||"").slice(0,10))+'</td>'+
+      '<td data-l="หมายเหตุ" style="font-size:13.5px">'+(m.note?esc(m.note):'<span class="muted">—</span>')+'</td>'+
+      '<td><div class="rowacts">'+
+        '<button class="btn ghost sm" data-usredit="'+esc(m.userId)+'">แก้ไข</button>'+
+        (isMe?'':'<button class="btn ghost sm" data-usrdel="'+esc(m.userId)+'">ลบ</button>')+
+      '</div></td></tr>';
+  }).join("") : '<tr><td colspan="7"><div class="empty">ยังไม่มีผู้ใช้ในระบบ</div></td></tr>')+
+  '</tbody></table></div></div>'+
+  '<div class="card" style="margin-top:14px"><div class="card-b muted" style="font-size:14px;line-height:1.75">'+
+  '<b>แอดมิน</b> — จัดการผู้ใช้ได้ (เพิ่ม ลบ เปลี่ยนรหัส เปลี่ยนสิทธิ์) และแก้ข้อมูลโครงการได้ทุกอย่าง<br>'+
+  '<b>ผู้ใช้ทั่วไป</b> — แก้ข้อมูลโครงการได้ทุกอย่างเหมือนกัน แต่ไม่เห็นเมนูนี้<br>'+
+  'ผู้ใช้ล็อกอินด้วย <b>ชื่อผู้ใช้</b> เท่านั้น ไม่ต้องมีอีเมล และกดลืมรหัสผ่านเองไม่ได้ — '+
+  'ถ้าลืมให้แอดมินกด “แก้ไข” แล้วตั้งรหัสใหม่ให้'+
+  '</div></div>';
+}
+function editUser(id){
+  const m = id ? (S.members||[]).find(x=>x.userId===id) : null;
+  openModal(m ? "แก้ไขผู้ใช้ · "+m.username : "เพิ่มผู้ใช้",
+    (m ? '<div class="f-row"><label>ชื่อผู้ใช้</label><div class="num" style="font-weight:600;padding:4px 0">'+
+          esc(m.username)+'</div></div>'
+       : fld("username","ชื่อผู้ใช้ (ตัวอังกฤษพิมพ์เล็ก/ตัวเลข ห้ามเว้นวรรค)",""))+
+    fld("name","ชื่อ-สกุล / ตำแหน่ง", m?m.name:"")+
+    fld("password", m?"ตั้งรหัสผ่านใหม่ (เว้นว่าง = ไม่เปลี่ยน)":"รหัสผ่าน (อย่างน้อย 6 ตัว)","","text")+
+    sel("role","สิทธิ์", m?m.role:"member", [["member","ผู้ใช้ทั่วไป"],["admin","แอดมิน — จัดการผู้ใช้ได้"]])+
+    fld("note","หมายเหตุ", m?m.note:""),
+    async o=>{
+      if(m){
+        await Store.updateMember({userId:m.userId, name:o.name, note:o.note, role:o.role,
+                                  password:o.password || undefined});
+      }else{
+        if(!o.username) throw new Error("กรอกชื่อผู้ใช้");
+        if(!o.password || o.password.length<6) throw new Error("รหัสผ่านต้องยาวอย่างน้อย 6 ตัว");
+        await Store.createMember({username:o.username, password:o.password, name:o.name, role:o.role, note:o.note});
+      }
+      await loadMembers();
+      if(!m) toast("เพิ่มผู้ใช้ "+o.username+" แล้ว — แจ้งชื่อผู้ใช้และรหัสผ่านให้เจ้าตัว");
+    });
+}
+async function delUser(id){
+  const m = (S.members||[]).find(x=>x.userId===id); if(!m) return;
+  if(!confirm('ลบผู้ใช้ "'+m.username+'" ออกจากระบบ?\nเขาจะเข้าใช้งานไม่ได้อีก (ข้อมูลโครงการไม่หายไปไหน)')) return;
+  try{ await Store.deleteMember(id); await loadMembers(); renderAll(); toast("ลบผู้ใช้ "+m.username+" แล้ว"); }
+  catch(e){ toast("ลบไม่สำเร็จ: "+(e.message||e)); }
+}
+
 /* ============================ forms ============================ */
 function openModal(title, fieldsHTML, onSave, extraFoot){
   $("#overlay").innerHTML='<div class="scrim" data-close="1"><div class="modal" role="dialog" aria-modal="true">'+
@@ -1051,8 +1138,10 @@ function openModal(title, fieldsHTML, onSave, extraFoot){
   $("#msave").onclick=async ()=>{
     const fd=new FormData($("#mform")); const o={};
     fd.forEach((v,k)=>o[k]=v);
-    try{ await onSave(o); closeOverlay(); toast("บันทึกแล้ว"); }
-    catch(e){ toast("บันทึกไม่สำเร็จ: "+(e.code||e.message)); }
+    $("#msave").disabled=true;
+    try{ await onSave(o); closeOverlay(); if(S.view!=="users") toast("บันทึกแล้ว"); renderAll(); }
+    catch(e){ toast("บันทึกไม่สำเร็จ: "+(e.message||e.code||e)); }
+    finally{ const b=$("#msave"); if(b) b.disabled=false; }
   };
   const f=$("#mform"); if(f) f._snap=snapOf(f);
   const first=$("#mform input,#mform select,#mform textarea"); if(first) first.focus();
@@ -1312,14 +1401,18 @@ document.addEventListener("touchstart", e=>{ downOnScrim=isScrim(e.target); }, t
 document.addEventListener("click",async e=>{
   if(e.target.closest("button[data-close]")){ tryClose(); return; }
   if(isScrim(e.target)){ if(downOnScrim) tryClose(); return; }
-  const t=e.target.closest("[data-go],[data-view],[data-act],[data-edit],[data-del],[data-files],[data-dl],[data-rmfile]");
+  const t=e.target.closest("[data-go],[data-view],[data-act],[data-edit],[data-del],[data-files],[data-dl],[data-rmfile],[data-usredit],[data-usrdel]");
   if(!t) return;
   if(t.dataset.go){
     const [view,row]=t.dataset.go.split("#");
     goTo(view,{contract:t.dataset.gc||"",status:t.dataset.gs||"",q:t.dataset.gq||"",row:row||""});
     return;
   }
-  if(t.dataset.view){ S.view=t.dataset.view; S.filter={contract:"",status:"",q:""}; closeNav(); renderAll(); window.scrollTo({top:0}); return; }
+  if(t.dataset.view){
+    S.view=t.dataset.view; S.filter={contract:"",status:"",q:""}; closeNav(); renderAll(); window.scrollTo({top:0});
+    if(S.view==="users"){ await loadMembers(); renderAll(); }
+    return;
+  }
   if(t.dataset.act){
     const a=t.dataset.act;
     if(a==="new-pay") editPayment(null);
@@ -1332,6 +1425,7 @@ document.addEventListener("click",async e=>{
     if(a==="docs-clear"){ S.filter={contract:"",status:"",q:""}; renderAll(); }
     if(a==="export-rfa") saveCSV("งานขออนุมัติ-มหาวิหารเก้าฟ้า.csv",rfaRows());
     if(a==="new-contract") editContract(null);
+    if(a==="new-user") editUser(null);
     if(a==="export-pay") saveCSV("งวดงาน-มหาวิหารเก้าฟ้า.csv",payRows());
     if(a==="export-all") saveCSV("สรุปโครงการ-มหาวิหารเก้าฟ้า.csv",allRows());
     return;
@@ -1345,6 +1439,8 @@ document.addEventListener("click",async e=>{
     if(!confirm("ลบรายการนี้? เอกสารแนบจะยังอยู่ในคลังเอกสาร")) return;
     await remove({pay:COLS.payments,extra:COLS.extras,rfa:COLS.rfas,eot:COLS.eots}[k],id); toast("ลบแล้ว"); return;
   }
+  if(t.dataset.usredit){ editUser(t.dataset.usredit); return; }
+  if(t.dataset.usrdel){ await delUser(t.dataset.usrdel); return; }
   if(t.dataset.files){ const [rt,rid]=t.dataset.files.split(":"); openFiles(rt,rid); return; }
   if(t.dataset.dl){ const f=S.files.find(x=>x.id===t.dataset.dl); if(f) downloadFile(f); return; }
   if(t.dataset.rmfile){ const f=S.files.find(x=>x.id===t.dataset.rmfile); if(f){ await deleteFile(f); if(openFiles._render) openFiles._render(); } return; }

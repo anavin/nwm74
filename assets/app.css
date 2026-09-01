@@ -529,3 +529,7 @@ tr.flash>td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
   .duetbl tfoot td:empty{display:none}
   .duetbl tfoot td:nth-child(2){text-align:right !important;font-size:19px;font-weight:700}
 }
+
+/* ---------- ป้ายสิทธิ์แอดมินในแถบซ้าย ---------- */
+.rolechip{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:3px;font-size:11px;
+  font-weight:600;letter-spacing:.04em;background:var(--brass);color:#1A1508;vertical-align:1px}
