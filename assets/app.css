@@ -225,7 +225,7 @@ td.c,th.c{text-align:center}
 .drop{border:1px dashed var(--line-strong);border-radius:var(--radius);padding:26px 20px;text-align:center;
   color:var(--ink-3);font-size:14px;cursor:pointer;background:var(--surface-2);line-height:1.7}
 .drop.hot{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-soft)}
-.filerow{display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.filerow{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
 .filerow .ic.link{background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent-ink);font-size:9px}
 .filerow .ic{width:34px;height:34px;border-radius:3px;background:var(--surface-2);color:var(--ink-3);
   border:1px solid var(--line);display:grid;place-items:center;font-size:11px;font-weight:600;
@@ -286,6 +286,9 @@ td.c,th.c{text-align:center}
 .docslot{border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;background:var(--surface)}
 .docslot.needed{border-color:var(--due);background:var(--due-soft)}
 .docslot.filled{background:var(--surface)}
+.docslot.covered{border-color:color-mix(in srgb,var(--paid) 30%,transparent);background:var(--paid-soft)}
+.docslot.covered .ab{background:var(--paid-soft);border:1px dashed var(--paid);color:var(--paid)}
+.docslot.covered .st{color:var(--paid)}
 .docslot header{display:flex;align-items:center;gap:11px}
 .docslot .ab{width:28px;height:28px;border-radius:5px;display:grid;place-items:center;flex:none;
   background:var(--accent-soft);color:var(--accent-ink);font-weight:700;font-size:13.5px}
@@ -311,6 +314,15 @@ td.c,th.c{text-align:center}
   .drow{flex-wrap:wrap}
   .dacts{width:100%;justify-content:flex-end}
 }
+.ftrow{display:flex;align-items:center;gap:8px;flex:1 1 100%;order:5;min-width:0;
+  margin-top:2px;font-size:12px;color:var(--ink-3);cursor:pointer}
+.ftrow>span{flex:none;letter-spacing:.02em}
+.ftype{flex:1;min-width:0;padding:5px 8px;border:1px solid var(--line-strong);border-radius:4px;
+  background:var(--surface-2);font-size:12.5px;color:var(--ink-2);cursor:pointer}
+.okrow{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px dashed var(--line-strong);
+  border-radius:var(--radius);background:var(--surface-2);font-size:13.5px;cursor:pointer}
+.okrow input{margin-top:3px;width:18px;height:18px;flex:none}
+.okrow small{font-size:12px;line-height:1.5;display:block;margin-top:2px}
 .notecard{border-color:var(--brass-line);background:var(--brass-soft)}
 .notecard .card-h{border-bottom-color:var(--brass-line)}
 .notecard .card-h:before{background:var(--brass)}

@@ -17,9 +17,9 @@ const MAPS = {
     bank:"bank"},
   payments: {contractId:"contract_id", seq:"seq", detail:"detail", amount:"amount", vat:"vat",
     retention:"retention", invoice:"invoice", reqDate:"req_date", certDate:"cert_date",
-    paidDate:"paid_date", note:"note"},
+    paidDate:"paid_date", docsOk:"docs_ok", note:"note"},
   extras: {building:"building", detail:"detail", amount:"amount", discount:"discount",
-    invoice:"invoice", reqDate:"req_date", paidDate:"paid_date", note:"note"},
+    invoice:"invoice", reqDate:"req_date", paidDate:"paid_date", docsOk:"docs_ok", note:"note"},
   eot: {no:"no", docNo:"doc_no", contractId:"contract_id", submitDate:"submit_date", reason:"reason",
     days:"days", oldEnd:"old_end", newEnd:"new_end", status:"status", decisionDate:"decision_date",
     eventDate:"event_date", note:"note"},
@@ -46,7 +46,7 @@ function toRow(table, obj){
 }
 function fromRow(table, row){
   const map = MAPS[table], out = {id: row.id};
-  for(const k in map) out[k] = row[map[k]] === null ? "" : row[map[k]];
+  for(const k in map){ const v = row[map[k]]; out[k] = (v === null || v === undefined) ? (map[k].endsWith("_ok") ? false : "") : v; }
   return out;
 }
 

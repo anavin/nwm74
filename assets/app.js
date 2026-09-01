@@ -190,8 +190,10 @@ async function remove(col,id){
 
 /* ============================ ประเภทเอกสารแนบ ============================ */
 const DOC_TYPES = {
-  payment:[["invoice","ใบเบิก","บ"],["report","รายงานงวดงาน","ร"],["slip","สลิปโอนเงิน","ส"],["other","อื่นๆ","อ"]],
-  extra:  [["invoice","ใบเบิก","บ"],["report","รายงาน / รูปงาน","ร"],["slip","สลิปโอนเงิน","ส"],["other","อื่นๆ","อ"]],
+  payment:[["invoice","ใบเบิก","บ"],["report","รายงานงวดงาน","ร"],["bundle","ใบเบิก + รายงาน (เล่มเดียว)","บร"],
+           ["slip","สลิปโอนเงิน","ส"],["other","อื่นๆ","อ"]],
+  extra:  [["invoice","ใบเบิก","บ"],["report","รายงาน / รูปงาน","ร"],["bundle","ใบเบิก + รายงาน (เล่มเดียว)","บร"],
+           ["slip","สลิปโอนเงิน","ส"],["other","อื่นๆ","อ"]],
   rfa:    [["form","แบบฟอร์ม RFA","ฟ"],["spec","แคตตาล็อก / สเปก","ค"],["drawing","Shop Drawing","ด"],["result","ผลอนุมัติ","ผ"],["other","อื่นๆ","อ"]],
   contract:[["contract","สัญญาก่อสร้าง","ส"],["drawing","แบบก่อสร้าง","บ"],["boq","BOQ / ราคากลาง","ค"],
             ["annex","เอกสารแนบท้าย / แก้ไขสัญญา","น"],["other","อื่นๆ","อ"]],
@@ -205,6 +207,8 @@ const GUESS=[[/สลิป|slip|โอน|transfer|pay[-_ ]?in/i,"slip"],[/ใ�
   [/อนุมัติ|approve|result/i,"result"]];
 function guessType(name,refType){
   const allowed=(DOC_TYPES[refType]||[]).map(x=>x[0]);
+  // ชื่อไฟล์ที่มีทั้ง "ใบเบิก" และ "รายงาน" = เล่มรวม
+  if(allowed.includes("bundle") && /ใบเบิก|เบิก|invoice/i.test(name) && /รายงาน|report/i.test(name)) return "bundle";
   for(const [re,t] of GUESS) if(re.test(name) && allowed.includes(t)) return t;
   return "other";
 }
@@ -219,14 +223,20 @@ function requiredDocs(rt,rec){
 }
 function docState(rt,rec){
   const fs=filesFor(rt,rec.id), have=new Set(fs.map(f=>f.docType||"other"));
+  if(have.has("bundle")){ have.add("invoice"); have.add("report"); }   // เล่มรวมนับเป็นทั้งใบเบิกและรายงาน
   const need=requiredDocs(rt,rec);
-  return {files:fs, have, need, missing:need.filter(t=>!have.has(t))};
+  const missing = rec.docsOk ? [] : need.filter(t=>!have.has(t));
+  return {files:fs, have, need, missing, confirmed:!!rec.docsOk};
 }
 /* ตัวบ่งชี้เอกสารในตาราง — ตัวอักษรย่อ ทึบ = มีแล้ว, เส้นประ = ยังขาด */
 function docChip(rt,rec){
   const st=docState(rt,rec);
-  const shown=st.need.length?st.need:(DOC_TYPES[rt]||[]).slice(0,3).map(x=>x[0]);
+  let shown=st.need.length?st.need.slice():(DOC_TYPES[rt]||[]).slice(0,3).map(x=>x[0]);
+  const rawHave=new Set(st.files.map(f=>f.docType||"other"));
+  if(rawHave.has("bundle")) shown=["bundle"].concat(shown.filter(t=>t!=="invoice"&&t!=="report"));
   const extra=st.files.filter(f=>!shown.includes(f.docType||"other")).length;
+  if(st.confirmed) return '<button class="docchip" data-files="'+rt+':'+rec.id+'" title="ยืนยันเอกสารครบแล้ว">'+
+    '<i class="on" title="ยืนยันเอกสารครบแล้ว">✓</i></button>';
   return '<button class="docchip" data-files="'+rt+':'+rec.id+'" title="จัดการเอกสารแนบ">'+
     shown.map(t=>{const m=docMeta(rt,t);
       return '<i class="'+(st.have.has(t)?"on":"miss")+'" title="'+esc(m[1])+'">'+m[2]+'</i>';}).join("")+
@@ -514,7 +524,8 @@ function viewPay(){
   const gaps=S.payments.map(p=>({p,st:docState("payment",p)})).filter(g=>g.st.missing.length);
   const gapBar = gaps.length? '<div class="card notecard" style="margin-bottom:14px">'+
     '<div class="card-h"><h3>หมายเหตุ — เอกสารยังไม่ครบ '+gaps.length+' งวด</h3>'+
-    '<span class="hint">ยังไม่จ่าย: ต้องมีใบเบิก + รายงานงวดงาน · จ่ายแล้ว: ต้องมีสลิปโอนเงินด้วย</span></div>'+
+    '<span class="hint">ยังไม่จ่าย: ต้องมีใบเบิก + รายงานงวดงาน · จ่ายแล้ว: ต้องมีสลิปโอนเงินด้วย<br>'+
+    'ถ้าใบเบิกกับรายงานอยู่ในเล่มเดียวกัน ให้เลือกประเภท “ใบเบิก + รายงาน (เล่มเดียว)” ตอนแนบไฟล์</span></div>'+
     '<div class="card-b" style="display:grid;gap:9px">'+
       gaps.slice(0,10).map(g=>{
         const c=contractOf(g.p);
@@ -1107,7 +1118,10 @@ function openFiles(refType,refId){
       '<div class="mt">'+(f.url?esc(String(f.url).replace(/^https?:\/\//,"").slice(0,42)):bytes(f.size))+
       ' · '+thDate((f.createdAt||"").slice(0,10))+'</div></div>'+
       '<button class="btn ghost sm" data-dl="'+f.id+'">เปิด</button>'+
-      '<button class="btn ghost sm" data-rmfile="'+f.id+'">ลบ</button></div>'+
+      '<button class="btn ghost sm" data-rmfile="'+f.id+'">ลบ</button>'+
+      '<label class="ftrow"><span>ประเภท</span><select class="ftype" data-ftype="'+f.id+'">'+
+        (DOC_TYPES[refType]||DOC_TYPES.payment).map(d=>'<option value="'+d[0]+'"'+
+          ((f.docType||"other")===d[0]?" selected":"")+'>'+esc(d[1])+'</option>').join("")+'</select></label></div>'+
       (/^image\//.test(f.mime||"")?'<img class="thumb" data-img="'+f.id+'" alt="'+esc(f.name)+'">':"");
 
   const render=()=>{
@@ -1115,10 +1129,15 @@ function openFiles(refType,refId){
     const types=DOC_TYPES[refType]||DOC_TYPES.payment;
     $("#flist").innerHTML = types.map(([t,label,ab])=>{
       const fs=st.files.filter(f=>(f.docType||"other")===t);
-      const need=st.need.includes(t);
-      return '<section class="docslot'+(fs.length?" filled":(need?" needed":""))+'">'+
+      const need=st.need.includes(t), missing=st.missing.includes(t);
+      const covered = need && !missing && !fs.length;   // ครบแล้วโดยเล่มรวม หรือผู้ใช้ยืนยันเอง
+      const cls = fs.length?" filled" : missing?" needed" : covered?" covered" : "";
+      const status = fs.length ? fs.length+" ไฟล์"
+        : covered ? (st.have.has("bundle")&&(t==="invoice"||t==="report") ? "✓ รวมอยู่ในเล่มเดียวกัน" : "✓ ยืนยันว่าครบแล้ว")
+        : missing ? "ยังไม่มี — จำเป็นต้องมี" : "ยังไม่มี";
+      return '<section class="docslot'+cls+'">'+
         '<header><span class="ab">'+ab+'</span><div><div class="lb">'+esc(label)+'</div>'+
-        '<div class="st">'+(fs.length? fs.length+" ไฟล์" : (need?"ยังไม่มี — จำเป็นต้องมี":"ยังไม่มี"))+'</div></div>'+
+        '<div class="st">'+status+'</div></div>'+
         '<button class="btn sm" data-add="'+t+'">แนบไฟล์</button>'+
         '<button class="btn sm" data-link="'+t+'">ลิงก์</button></header>'+
         (fs.length? fs.map(fileRow).join("") : "")+'</section>';
@@ -1138,6 +1157,10 @@ function openFiles(refType,refId){
       '<span class="muted">ระบบจะเดาประเภทจากชื่อไฟล์ให้ · ไม่เกิน 50 MB ต่อไฟล์</span></div>'+
       '<input type="file" id="fin" multiple hidden>'+
       '<div id="flist" style="display:grid;gap:10px"></div>'+
+      ((refType==="payment"||refType==="extra")?
+        '<label class="okrow"><input type="checkbox" id="docsOk"'+(rec.docsOk?" checked":"")+'>'+
+        '<span>เอกสารครบแล้ว — ไม่ต้องเตือน<br><small class="muted">ใช้เมื่อเอกสารรวมอยู่ในเล่มเดียวกัน '+
+        'หรืองวดนี้ตกลงกันว่าไม่ต้องมีเอกสารบางอย่าง</small></span></label>':'')+
     '</div></div></div>';
 
   const drop=$("#drop"), fin=$("#fin");
@@ -1152,6 +1175,19 @@ function openFiles(refType,refId){
     if(lk){ addLinkDialog(refType,refId,lk.dataset.link,()=>openFiles(refType,refId)); return; }
     const b=e.target.closest("[data-add]"); if(!b) return;
     pendingType=b.dataset.add; fin.click();
+  });
+  const okBox=$("#docsOk");
+  if(okBox) okBox.onchange=async ()=>{
+    try{ await save(refType==="payment"?COLS.payments:COLS.extras, refId,
+      Object.assign({}, refRecord(refType,refId), {docsOk:okBox.checked})); toast(okBox.checked?"บันทึกว่าเอกสารครบแล้ว":"เปิดการเตือนเอกสารอีกครั้ง"); }
+    catch(e){ toast("บันทึกไม่สำเร็จ: "+(e.message||e)); }
+  };
+  $("#flist").addEventListener("change",async e=>{
+    const sel=e.target.closest("[data-ftype]"); if(!sel) return;
+    const f=S.files.find(x=>x.id===sel.dataset.ftype); if(!f) return;
+    try{ await Store.save(COLS.files, f.id, Object.assign({}, f, {docType:sel.value})); await refresh();
+      toast("เปลี่ยนประเภทเป็น "+docMeta(refType,sel.value)[1]); openFiles(refType,refId); }
+    catch(err){ toast("เปลี่ยนประเภทไม่สำเร็จ: "+(err.message||err)); }
   });
   openFiles._render=render; render();
 }

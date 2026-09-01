@@ -43,6 +43,7 @@ create table if not exists nm74.payments (
   invoice     text,
   req_date    date,
   cert_date   date,                           -- วันที่ CM รับรองผลตรวจ
+  docs_ok     boolean default false,          -- ยืนยันว่าเอกสารครบแล้ว (ปิดการเตือน)
   paid_date   date,
   note        text,
   created_at  timestamptz default now(),
@@ -59,6 +60,7 @@ create table if not exists nm74.extras (
   invoice    text,
   req_date   date,
   paid_date  date,
+  docs_ok    boolean default false,
   note       text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
