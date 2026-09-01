@@ -243,16 +243,17 @@ async function remove(col,id){
 /* ============================ ประเภทเอกสารแนบ ============================ */
 const DOC_TYPES = {
   payment:[["invoice","ใบเบิก","บ"],["report","รายงานงวดงาน","ร"],["bundle","ใบเบิก + รายงาน (เล่มเดียว)","บร"],
-           ["slip","สลิปโอนเงิน","ส"],["other","อื่นๆ","อ"]],
+           ["slip","สลิปโอนเงิน","ส"],["receipt","ใบเสร็จรับเงิน","สร"],["other","อื่นๆ","อ"]],
   extra:  [["invoice","ใบเบิก","บ"],["report","รายงาน / รูปงาน","ร"],["bundle","ใบเบิก + รายงาน (เล่มเดียว)","บร"],
-           ["slip","สลิปโอนเงิน","ส"],["other","อื่นๆ","อ"]],
+           ["slip","สลิปโอนเงิน","ส"],["receipt","ใบเสร็จรับเงิน","สร"],["other","อื่นๆ","อ"]],
   rfa:    [["form","แบบฟอร์ม RFA","ฟ"],["spec","แคตตาล็อก / สเปก","ค"],["drawing","Shop Drawing","ด"],["result","ผลอนุมัติ","ผ"],["other","อื่นๆ","อ"]],
   contract:[["contract","สัญญาก่อสร้าง","ส"],["drawing","แบบก่อสร้าง","บ"],["boq","BOQ / ราคากลาง","ค"],
             ["annex","เอกสารแนบท้าย / แก้ไขสัญญา","น"],["other","อื่นๆ","อ"]],
   eot:    [["letter","หนังสือขอขยายเวลา","น"],["form","แบบฟอร์ม RFA","ฟ"],["support","เอกสารประกอบ","ป"],["result","ผลอนุมัติ","ผ"],["other","อื่นๆ","อ"]]
 };
 const docMeta=(rt,t)=>(DOC_TYPES[rt]||DOC_TYPES.payment).find(x=>x[0]===t)||["other","อื่นๆ","อ"];
-const GUESS=[[/สลิป|slip|โอน|transfer|pay[-_ ]?in/i,"slip"],[/ใบเบิก|เบิก|invoice|บิล|แจ้งหนี้|pph|nt20/i,"invoice"],
+const GUESS=[[/ใบเสร็จ|เสร็จรับเงิน|ใบกำกับภาษี|receipt|tax[-_ ]?invoice/i,"receipt"],
+  [/สลิป|slip|โอน|transfer|pay[-_ ]?in/i,"slip"],[/ใบเบิก|เบิก|invoice|บิล|แจ้งหนี้|pph|nt20/i,"invoice"],
   [/รายงาน|report|ตรวจ|inspect|progress/i,"report"],[/shop|drawing|แบบขยาย|dwg/i,"drawing"],
   [/catalog|แคตตาล็อก|spec|สเปค|brochure/i,"spec"],[/สัญญา|contract|agreement/i,"contract"],
   [/boq|ราคากลาง|ปริมาณงาน/i,"boq"],[/แนบท้าย|annex|addendum|แก้ไขสัญญา/i,"annex"],[/rfa|ฟอร์ม/i,"form"],[/หนังสือ|letter/i,"letter"],
@@ -286,6 +287,8 @@ function docChip(rt,rec){
   let shown=st.need.length?st.need.slice():(DOC_TYPES[rt]||[]).slice(0,3).map(x=>x[0]);
   const rawHave=new Set(st.files.map(f=>f.docType||"other"));
   if(rawHave.has("bundle")) shown=["bundle"].concat(shown.filter(t=>t!=="invoice"&&t!=="report"));
+  /* ประเภทที่ไม่ได้บังคับแต่แนบไว้แล้ว (เช่น ใบเสร็จ) ก็ควรเห็นในป้าย */
+  (DOC_TYPES[rt]||[]).forEach(d=>{ if(d[0]!=="other" && rawHave.has(d[0]) && !shown.includes(d[0])) shown.push(d[0]); });
   const extra=st.files.filter(f=>!shown.includes(f.docType||"other")).length;
   if(st.confirmed) return '<button class="docchip" data-files="'+rt+':'+rec.id+'" title="ยืนยันเอกสารครบแล้ว">'+
     '<i class="on" title="ยืนยันเอกสารครบแล้ว">✓</i></button>';
@@ -883,7 +886,7 @@ function planFile(name){
   if(/CM[-\s]?P?92/i.test(n)&&(m=n.match(/งวด\s?(\d+)/))){
     const c3=S.contracts.find(c=>/CM/i.test(c.code));
     const p=c3&&S.payments.find(p=>p.contractId===c3.id&&p.seq===Number(m[1]));
-    if(p) return pick("payment",p.id, isSlip||isImg?"slip":(/ใบเสร็จ/.test(n)?"other":"invoice"));
+    if(p) return pick("payment",p.id, /ใบเสร็จ|ใบกำกับภาษี/.test(n)?"receipt":(isSlip||isImg?"slip":"invoice"));
   }
   /* ใบสรุปเอกสารประกอบการเบิก */
   if(/สรุปเอกสารเบิก/.test(n)&&(m=n.match(/งวดที่\s*(\d+)\s*ตึก\s*3/))){
