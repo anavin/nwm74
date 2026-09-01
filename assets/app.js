@@ -438,16 +438,16 @@ function viewDash(){
     (unit?'<small>'+unit+'</small>':'')+'</div><div class="note">'+(note||"")+'</div></div>';
 
   $("#view").innerHTML =
-  /* ============ แผงค้างจ่าย ============ */
+  /* ============ แผงค้างจ่าย — ไม่มีรายการค้าง = ไม่ต้องแสดง ============ */
+  (dueRows.length ?
   '<section class="hero">'+
     '<div class="hero-main">'+
       '<div class="hero-lab">ยอดค้างจ่าย ณ วันนี้</div>'+
       '<div class="hero-fig">'+money(dueTotal)+'<small>บาท</small></div>'+
-      '<div class="hero-sub">'+ (dueRows.length ?
+      '<div class="hero-sub">'+
         '<button class="golink" data-go="pay" data-gs="due">'+dueRows.length+' รายการที่เบิกแล้วยังไม่ได้โอน</button>'+
         (overdue.length?' · <button class="golink warn" data-go="pay" data-gs="late">เลยกำหนดจ่ายแล้ว '+overdue.length+
-          ' รายการ ('+money(overdueSum)+' บาท)</button>':' · ยังไม่มีรายการเลยกำหนด')
-        : 'โอนครบทุกงวดที่เบิกมาแล้ว · รอผู้รับจ้างยื่นเบิกงวดถัดไป')+
+          ' รายการ ('+money(overdueSum)+' บาท)</button>':' · ยังไม่มีรายการเลยกำหนด')+
       '</div>'+
     '</div>'+
     '<div class="hero-split">'+
@@ -460,10 +460,9 @@ function viewDash(){
         '<div class="hs-row go" role="button" tabindex="0" data-go="extra"><span class="hs-nm">งานเพิ่ม</span><span class="hs-bar"><i style="width:'+
         Math.round(S.extras.filter(x=>!isPaid(x)).reduce((s,x)=>s+paidNet(x),0)/Math.max(1,dueTotal)*100)+
         '%"></i></span><span class="hs-val num">'+money(S.extras.filter(x=>!isPaid(x)).reduce((s,x)=>s+paidNet(x),0))+'</span></div>':'')+
-      (dueTotal ? "" : '<div class="hs-none">ไม่มียอดค้างกับผู้รับจ้างรายใด</div>')+
       '<div class="hs-foot">รอบจ่ายเฉลี่ยที่ผ่านมา '+(lag==null?"—":lag+" วัน")+' หลังยื่นใบเบิก</div>'+
     '</div>'+
-  '</section>'+
+  '</section>' : "")+
 
   /* ============ ตารางค้างจ่ายรายรายการ ============ */
   /* ไม่มีรายการค้าง = ไม่ต้องแสดงการ์ดนี้เลย */
