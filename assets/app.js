@@ -163,7 +163,7 @@ async function boot(){
   Store.onAuth(async session=>{
     if(!session){ showLogin(); return; }
     hideLogin();
-    $("#dbstate").innerHTML = "เข้าสู่ระบบ: " + esc(session.user.email||"") ;
+    $("#dbstate").innerHTML = "เข้าสู่ระบบ: " + esc(Store.displayName(session.user.email||"")) ;
     await refresh();
     Store.subscribe(()=>refresh());
   });
@@ -1392,16 +1392,22 @@ function showLogin(){
   $("#overlay").innerHTML='<div class="scrim" style="align-items:center"><div class="modal" style="width:min(400px,100%)">'+
     '<div class="card-h"><h3>เข้าสู่ระบบ</h3></div>'+
     '<form class="card-b" id="loginform" onsubmit="return false">'+
-      '<div class="f-row"><label for="lg_email">อีเมล</label><input id="lg_email" type="email" autocomplete="username" required></div>'+
+      '<div class="f-row"><label for="lg_email">ชื่อผู้ใช้</label>'+
+      '<input id="lg_email" type="text" autocomplete="username" autocapitalize="none" '+
+      'spellcheck="false" placeholder="เช่น anavin" required></div>'+
       '<div class="f-row"><label for="lg_pw">รหัสผ่าน</label><input id="lg_pw" type="password" autocomplete="current-password" required></div>'+
       '<div id="lg_err" class="muted" style="font-size:13.5px;color:var(--late)"></div>'+
     '</form>'+
     '<div class="foot"><button class="btn primary" id="lg_go">เข้าสู่ระบบ</button></div></div></div>';
   const go=async()=>{
-    const email=$("#lg_email").value.trim(), pw=$("#lg_pw").value;
+    const user=$("#lg_email").value.trim(), pw=$("#lg_pw").value;
     $("#lg_err").textContent="";
-    try{ await Store.signIn(email,pw); }
-    catch(e){ $("#lg_err").textContent = /Invalid/i.test(e.message||"")?"อีเมลหรือรหัสผ่านไม่ถูกต้อง":(e.message||"เข้าสู่ระบบไม่สำเร็จ"); }
+    if(!user||!pw){ $("#lg_err").textContent="กรอกชื่อผู้ใช้และรหัสผ่านให้ครบ"; return; }
+    $("#lg_go").disabled=true;
+    try{ await Store.signIn(user,pw); }
+    catch(e){ $("#lg_err").textContent = /Invalid|credential/i.test(e.message||"")
+      ? "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" : (e.message||"เข้าสู่ระบบไม่สำเร็จ"); }
+    finally{ $("#lg_go").disabled=false; }
   };
   $("#lg_go").onclick=go;
   $("#loginform").addEventListener("keydown",e=>{ if(e.key==="Enter") go(); });

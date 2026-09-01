@@ -67,14 +67,26 @@ const Store = (() => {
     return true;
   }
 
-  /* ---------------- auth ---------------- */
+  /* ---------------- auth ----------------
+     ล็อกอินด้วย "ชื่อผู้ใช้" ไม่ต้องมีอีเมลจริง
+     Supabase Auth บังคับให้ผู้ใช้มีอีเมล ระบบจึงเติมโดเมนภายในให้อัตโนมัติ
+     เช่น พิมพ์ "somchai" → ใช้ somchai@nm74.local ตอนล็อกอิน
+     (ถ้าพิมพ์ที่มี @ อยู่แล้ว จะใช้ค่านั้นตรงๆ — อีเมลจริงก็ยังล็อกอินได้) */
+  const userDomain = () => (window.NM74_CONFIG && window.NM74_CONFIG.USER_DOMAIN) || "nm74.local";
+  const toEmail = u => {
+    const t = String(u||"").trim();
+    return t.includes("@") ? t : t.toLowerCase().replace(/\s+/g,"") + "@" + userDomain();
+  };
+  /* ตัดโดเมนภายในออกตอนแสดงผล */
+  const displayName = e => String(e||"").replace(new RegExp("@"+userDomain().replace(/\./g,"\\.")+"$","i"), "");
+
   function onAuth(cb){
     authCb = cb;
     sb.auth.getSession().then(({data}) => cb(data.session));
     sb.auth.onAuthStateChange((_e, session) => cb(session));
   }
-  async function signIn(email, password){
-    const {error} = await sb.auth.signInWithPassword({email, password});
+  async function signIn(user, password){
+    const {error} = await sb.auth.signInWithPassword({email: toEmail(user), password});
     if(error) throw error;
   }
   async function signOut(){ await sb.auth.signOut(); }
@@ -169,6 +181,6 @@ const Store = (() => {
     if(error) throw error;
   }
 
-  return {init, onAuth, signIn, signOut, loadAll, save, patch, remove, subscribe, uploadFile, addLink, fileUrl, deleteFile,
+  return {init, onAuth, signIn, signOut, displayName, loadAll, save, patch, remove, subscribe, uploadFile, addLink, fileUrl, deleteFile,
           get client(){ return sb; }};
 })();

@@ -6,5 +6,7 @@
    ห้ามใส่ service_role key ในไฟล์นี้เด็ดขาด */
 window.NM74_CONFIG = {
   SUPABASE_URL: "https://YOUR_PROJECT_REF.supabase.co",
-  SUPABASE_ANON_KEY: "YOUR_ANON_PUBLIC_KEY"
+  SUPABASE_ANON_KEY: "YOUR_ANON_PUBLIC_KEY",
+  /* โดเมนภายในสำหรับผู้ใช้ที่ไม่มีอีเมลจริง — ผู้ใช้พิมพ์แค่ชื่อ ระบบเติมให้เอง */
+  USER_DOMAIN: "nm74.local"
 };
