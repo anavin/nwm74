@@ -410,8 +410,7 @@ function viewDash(){
 
   /* ============ ตารางค้างจ่ายรายรายการ ============ */
   '<div class="card" style="margin-bottom:16px"><div class="card-h"><h3>รายการค้างจ่าย</h3>'+
-  '<span class="hint">เรียงตามสัญญา · ในสัญญาเรียงตามความเร่งด่วน · คลิกชื่อรายการเพื่อไปที่งวดนั้น<br>'+
-  '<button class="btn ghost sm" data-go="pay">ดูงวดงานทั้งหมด</button></span>'+
+  '<span class="hint"><button class="btn ghost sm" data-go="pay">ดูงวดงานทั้งหมด</button></span>'+
   '</div><div class="tablewrap">'+
   (dueRows.length?'<table class="duetbl"><thead><tr><th>รายการ</th><th>เลขที่ใบเบิก</th><th>ยื่นเมื่อ</th>'+
     '<th>ครบกำหนดจ่าย</th><th>สถานะเวลา</th><th class="r">ยอดที่ต้องโอน</th><th class="c">เอกสาร</th><th></th></tr></thead><tbody>'+
@@ -422,7 +421,7 @@ function viewDash(){
       return '<tr><td data-l="รายการ" class="stripe '+(late?"late":"due")+'" style="min-width:200px">'+
         '<button class="golink strong" data-go="'+gv+'#'+r.rt+':'+r.rec.id+'"'+gc+'>'+
           esc(r.who)+' · '+esc(r.what)+'</button>'+
-        '<div class="muted" style="font-size:13px">'+esc((r.rec.detail||"").slice(0,70))+'</div></td>'+
+        '<div class="muted" style="font-size:13px">'+esc(r.rec.detail||"")+'</div></td>'+
         '<td data-l="เลขที่ใบเบิก" class="num">'+esc(r.invoice||"—")+'</td>'+
         '<td data-l="ยื่นเมื่อ" class="num">'+thDate(r.date)+'</td>'+
         '<td data-l="ครบกำหนดจ่าย" class="num">'+(r.due?thDate(r.due):
@@ -445,12 +444,12 @@ function viewDash(){
   '<div class="card" style="margin-bottom:16px"><div class="card-h"><h3>งานขออนุมัติ (RFA)</h3>'+
   '<span class="hint"><span class="rfatally">'+
     '<b>'+S.rfas.length+'</b> รายการทั้งหมด'+
-    ' · รอผล <b>'+rfaDue.length+'</b>'+
-    ' · ต้องเร่ง <b'+(rfaLate.length?' class="ghlate"':'')+'>'+rfaLate.length+'</b>'+
-    ' · อนุมัติแล้ว <b>'+S.rfas.filter(r=>rfaState(r)==="paid").length+'</b>'+
-    ' · ยังไม่ยื่น <b>'+S.rfas.filter(r=>rfaState(r)==="idle").length+'</b>'+
-  '</span><br>ตารางนี้แสดงเฉพาะรายการที่ยื่นแล้ว · '+
-  '<button class="btn ghost sm" data-go="rfa">ดูทั้งหมด</button></span></div>'+
+    [["รอผล",rfaDue.length,""],["ต้องเร่ง",rfaLate.length,"ghlate"],
+     ["อนุมัติแล้ว",S.rfas.filter(r=>rfaState(r)==="paid").length,""],
+     ["ยังไม่ยื่น",S.rfas.filter(r=>rfaState(r)==="idle").length,""]]
+      .filter(t=>t[1]>0)                                   /* ตัวเลขที่เป็น 0 ไม่ต้องโชว์ */
+      .map(t=>' · '+t[0]+' <b'+(t[2]?' class="'+t[2]+'"':'')+'>'+t[1]+'</b>').join("")+
+  '</span> · <button class="btn ghost sm" data-go="rfa">ดูทั้งหมด</button></span></div>'+
   '<div class="tablewrap"><table><thead><tr><th>หมวดงาน / เรื่อง</th><th>เลขที่เอกสาร</th><th>ยี่ห้อ / รุ่น</th>'+
   '<th class="c">Lead time</th><th>ต้องอนุมัติภายใน</th><th>ยื่นเมื่อ</th><th class="c">สถานะ</th><th class="c">เอกสาร</th></tr></thead><tbody>'+
   (function(){ const shown=S.rfas.filter(r=>rfaState(r)!=="idle");
