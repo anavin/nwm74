@@ -457,7 +457,14 @@ function viewDash(){
 
   /* ============ งานขออนุมัติ ============ */
   '<div class="card" style="margin-bottom:16px"><div class="card-h"><h3>งานขออนุมัติ (RFA)</h3>'+
-  '<span class="hint">เฉพาะรายการที่ยื่นแล้ว · <button class="btn ghost sm" data-view="rfa">ดูทั้งหมด</button></span></div>'+
+  '<span class="hint"><span class="rfatally">'+
+    '<b>'+S.rfas.length+'</b> รายการทั้งหมด'+
+    ' · รอผล <b>'+rfaDue.length+'</b>'+
+    ' · ต้องเร่ง <b'+(rfaLate.length?' class="ghlate"':'')+'>'+rfaLate.length+'</b>'+
+    ' · อนุมัติแล้ว <b>'+S.rfas.filter(r=>rfaState(r)==="paid").length+'</b>'+
+    ' · ยังไม่ยื่น <b>'+S.rfas.filter(r=>rfaState(r)==="idle").length+'</b>'+
+  '</span><br>ตารางนี้แสดงเฉพาะรายการที่ยื่นแล้ว · '+
+  '<button class="btn ghost sm" data-go="rfa">ดูทั้งหมด</button></span></div>'+
   '<div class="tablewrap"><table><thead><tr><th>หมวดงาน / เรื่อง</th><th>เลขที่เอกสาร</th><th>ยี่ห้อ / รุ่น</th>'+
   '<th class="c">Lead time</th><th>ต้องอนุมัติภายใน</th><th>ยื่นเมื่อ</th><th class="c">สถานะ</th><th class="c">เอกสาร</th></tr></thead><tbody>'+
   (function(){ const shown=S.rfas.filter(r=>rfaState(r)!=="idle");
@@ -504,9 +511,6 @@ function viewDash(){
       (left>=0?"เหลืออีก "+left+" วัน":"เลยกำหนด "+Math.abs(left)+" วัน")+" · ขยายแล้ว "+approved+" วัน"+
       (waiting?" (รออนุมัติอีก "+waiting+" วัน)":""),
       ' data-go="eot"')+
-    kpi(rfaLate.length?"bad":(rfaDue.length?"warn":""),"งานขออนุมัติ",S.rfas.length,"รายการ",
-      "รอผล "+rfaDue.length+" · ต้องเร่ง "+rfaLate.length+" · อนุมัติแล้ว "+S.rfas.filter(r=>rfaState(r)==="paid").length,
-      ' data-go="rfa"')+
   '</div>'+
 
   /* ============ สองคอลัมน์ ============ */
@@ -1065,9 +1069,19 @@ function openModal(title, fieldsHTML, onSave, extraFoot){
     try{ await onSave(o); closeOverlay(); toast("บันทึกแล้ว"); }
     catch(e){ toast("บันทึกไม่สำเร็จ: "+(e.code||e.message)); }
   };
+  const f=$("#mform"); if(f) f._snap=snapOf(f);
   const first=$("#mform input,#mform select,#mform textarea"); if(first) first.focus();
 }
 const closeOverlay=()=>{ $("#overlay").innerHTML=""; };
+
+/* ---- กันข้อมูลที่กรอกไว้หายโดยไม่ตั้งใจ ---- */
+function snapOf(f){ const a=[]; new FormData(f).forEach((v,k)=>a.push(k+"="+v)); return a.join("\u0001"); }
+function formDirty(){ const f=$("#mform"); return !!(f && f._snap!==undefined && snapOf(f)!==f._snap); }
+/* ปิดกล่อง — ถ้ากรอกอะไรไว้แล้วยังไม่บันทึก ให้ถามก่อน */
+function tryClose(){
+  if(formDirty() && !confirm("ยังไม่ได้บันทึก — ถ้าปิดตอนนี้ ข้อมูลที่กรอกไว้จะหายไปทั้งหมด\n\nต้องการปิดหรือไม่?")) return;
+  closeOverlay();
+}
 const fld=(name,label,val,type)=>'<div class="f-row"><label for="f_'+name+'">'+label+'</label>'+
   (type==="textarea"?'<textarea id="f_'+name+'" name="'+name+'">'+esc(val??"")+'</textarea>'
    :'<input id="f_'+name+'" name="'+name+'" type="'+(type||"text")+'" value="'+esc(val??"")+'">')+'</div>';
@@ -1303,9 +1317,16 @@ function allRows(){
 }
 
 /* ============================ events ============================ */
+/* ปิดกล่องด้วยการคลิกฉากหลังได้ ก็ต่อเมื่อ "กดลง" ที่ฉากหลังจริงๆ
+   ถ้าเริ่มลากจากในช่องกรอก (เช่น ลากเลือกข้อความเพื่อคัดลอก) แล้วปล่อยเมาส์นอกกล่อง จะไม่ปิด */
+let downOnScrim=false;
+const isScrim = t => !!(t && t.classList && t.classList.contains("scrim"));
+document.addEventListener("mousedown", e=>{ downOnScrim=isScrim(e.target); }, true);
+document.addEventListener("touchstart", e=>{ downOnScrim=isScrim(e.target); }, true);
+
 document.addEventListener("click",async e=>{
-  if(e.target.closest("button[data-close]")){ closeOverlay(); return; }
-  if(e.target.classList && e.target.classList.contains("scrim")){ closeOverlay(); return; }
+  if(e.target.closest("button[data-close]")){ tryClose(); return; }
+  if(isScrim(e.target)){ if(downOnScrim) tryClose(); return; }
   const t=e.target.closest("[data-go],[data-view],[data-act],[data-edit],[data-del],[data-files],[data-dl],[data-rmfile]");
   if(!t) return;
   if(t.dataset.go){
