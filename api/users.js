@@ -65,6 +65,11 @@ async function requireAdmin(req) {
 const cleanUser = u => String(u || "").trim().toLowerCase().replace(/\s+/g, "");
 const toEmail = u => (cleanUser(u).includes("@") ? cleanUser(u) : cleanUser(u) + "@" + DOMAIN);
 const validUser = u => /^[a-z0-9][a-z0-9._-]{1,30}$/.test(cleanUser(u));
+/* userId ต้องเป็น uuid ตัวพิมพ์เล็กเท่านั้น
+   - ตัวพิมพ์ใหญ่จะทำให้การเทียบ id === me.id ไม่ตรง แล้วข้ามด่านกันลบตัวเอง/ลดสิทธิ์ตัวเองได้
+   - และกันไม่ให้ยิง path แปลกๆ เข้า /auth/v1/admin/... */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const cleanId = v => String(v || "").trim().toLowerCase();
 
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
@@ -130,13 +135,13 @@ export default async function handler(req, res) {
 
     /* ---------- แก้ไข: รหัสผ่าน / สิทธิ์ / ชื่อ ---------- */
     if (req.method === "PATCH") {
-      const id = String(body.userId || "");
-      if (!id) return res.status(400).json({ error: "ไม่พบผู้ใช้ที่ต้องการแก้ไข" });
+      const id = cleanId(body.userId);
+      if (!UUID_RE.test(id)) return res.status(400).json({ error: "ไม่พบผู้ใช้ที่ต้องการแก้ไข" });
 
       if (body.password) {
         if (String(body.password).length < 6)
           return res.status(400).json({ error: "รหัสผ่านต้องยาวอย่างน้อย 6 ตัว" });
-        await auth("/admin/users/" + id, { method: "PUT", body: JSON.stringify({ password: String(body.password) }) });
+        await auth("/admin/users/" + encodeURIComponent(id), { method: "PUT", body: JSON.stringify({ password: String(body.password) }) });
       }
 
       const patch = {};
@@ -144,7 +149,7 @@ export default async function handler(req, res) {
       if (body.name !== undefined) patch.name = body.name;
       if (body.note !== undefined) patch.note = body.note;
 
-      if (patch.role === "member" && id === me.id)
+      if (patch.role === "member" && id === cleanId(me.id))
         return res.status(400).json({ error: "ลดสิทธิ์ตัวเองไม่ได้ ให้แอดมินคนอื่นทำแทน" });
 
       if (Object.keys(patch).length) {
@@ -157,20 +162,25 @@ export default async function handler(req, res) {
 
     /* ---------- ลบผู้ใช้ ---------- */
     if (req.method === "DELETE") {
-      const id = String((body.userId || req.query.userId) || "");
-      if (!id) return res.status(400).json({ error: "ไม่พบผู้ใช้ที่ต้องการลบ" });
-      if (id === me.id) return res.status(400).json({ error: "ลบบัญชีตัวเองไม่ได้" });
+      const id = cleanId(body.userId || req.query.userId);
+      if (!UUID_RE.test(id)) return res.status(400).json({ error: "ไม่พบผู้ใช้ที่ต้องการลบ" });
+      if (id === cleanId(me.id)) return res.status(400).json({ error: "ลบบัญชีตัวเองไม่ได้" });
 
+      /* ต้องเหลือแอดมินอย่างน้อย 1 คนเสมอ ไม่งั้นจะไม่มีใครจัดการผู้ใช้ได้อีกเลย */
       const admins = await db("/members?role=eq.admin&select=user_id");
-      if (admins.length <= 1 && admins.some(a => a.user_id === id))
+      const ids = admins.map(a => cleanId(a.user_id));
+      if (ids.includes(id) && ids.length <= 1)
         return res.status(400).json({ error: "ต้องเหลือแอดมินอย่างน้อย 1 คน" });
 
-      await auth("/admin/users/" + id, { method: "DELETE" });   // members ลบตามด้วย on delete cascade
+      await auth("/admin/users/" + encodeURIComponent(id), { method: "DELETE" });   // members ลบตามด้วย on delete cascade
       return res.status(200).json({ ok: true });
     }
 
     return res.status(405).json({ error: "method ไม่รองรับ" });
   } catch (e) {
-    return res.status(e.status || 500).json({ error: e.message || "เกิดข้อผิดพลาด" });
+    const st = e.status || 500;
+    console.error("api/users error", st, e && e.message);      /* รายละเอียดเก็บไว้ฝั่งเซิร์ฟเวอร์ */
+    /* 4xx เป็นข้อความที่เราตั้งเอง ส่งกลับได้ · 5xx อาจมีชื่อคอลัมน์/โครงสร้างฐานข้อมูลติดมา */
+    return res.status(st).json({ error: st < 500 ? (e.message || "ทำรายการไม่สำเร็จ") : "ระบบขัดข้อง กรุณาลองใหม่" });
   }
 }

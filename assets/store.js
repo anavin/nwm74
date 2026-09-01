@@ -162,7 +162,14 @@ const Store = (() => {
     });
     if(error){ await sb.storage.from(BUCKET).remove([path]); throw error; }
   }
+  /* รับเฉพาะ http/https — กัน javascript: ที่รันโค้ดตอนกด "เปิด" */
+  const safeUrl = u => {
+    let x; try{ x = new URL(String(u||"").trim()); }catch(e){ throw new Error("ลิงก์ไม่ถูกต้อง"); }
+    if(x.protocol !== "http:" && x.protocol !== "https:") throw new Error("รับเฉพาะลิงก์ http:// หรือ https://");
+    return x.href;
+  };
   async function addLink({url, name, refType, refId, docType}){
+    url = safeUrl(url);
     const {error} = await sb.from("files").insert({
       name: name || url, size: null, mime: "link", url,
       ref_type: refType, ref_id: refId, doc_type: docType || "other", storage_path: null
@@ -170,7 +177,7 @@ const Store = (() => {
     if(error) throw error;
   }
   async function fileUrl(f){
-    if(f.url) return f.url;
+    if(f.url) return safeUrl(f.url);   /* ตรวจซ้ำตอนเปิด เผื่อมีแถวเก่าที่ไม่ปลอดภัยอยู่ในฐานข้อมูล */
     const {data, error} = await sb.storage.from(BUCKET).createSignedUrl(f.storagePath, 60 * 10);
     if(error) throw error;
     return data.signedUrl;

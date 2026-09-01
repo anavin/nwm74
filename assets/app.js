@@ -19,10 +19,11 @@ function thDateFull(iso){
    ทุกที่ที่แปลง Date เป็น YYYY-MM-DD ต้องใช้ isoLocal เท่านั้น */
 const isoLocal = d => d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 const todayISO = () => isoLocal(new Date());
-const TODAY = new Date(); TODAY.setHours(0,0,0,0);
+/* ต้องคำนวณใหม่ทุกครั้ง ไม่งั้นเปิดหน้าจอทิ้งไว้ข้ามคืนแล้ววันที่ค้างอยู่ที่เมื่อวาน */
+const today0 = () => { const d=new Date(); d.setHours(0,0,0,0); return d; };
 function daysBetween(isoA,isoB){
   if(!isoA) return null;
-  const a=new Date(isoA+"T00:00:00"), b=isoB?new Date(isoB+"T00:00:00"):TODAY;
+  const a=new Date(isoA+"T00:00:00"), b=isoB?new Date(isoB+"T00:00:00"):today0();
   if(isNaN(a)||isNaN(b)) return null;
   return Math.round((b-a)/86400000);
 }
@@ -121,23 +122,36 @@ function contractStats(c){
   const rest = Math.max(0, Number(c.amount||0)-base);         // เนื้องานคงเหลือ (ก่อน VAT)
   const retention = rows.filter(isPaid).reduce((s,p)=>s+Number(p.retention||0),0);
   const pct = Math.min(100, base/Math.max(1,Number(c.amount||0))*100);
-  return {rows,billed,paid,due,base,rest,retention,pct,count:rows.length};
+  /* gross = ยอดที่เรียกเก็บจริงตามใบเบิก (รวม VAT ยังไม่หักประกัน) — ใช้กับตัวเลข "เบิกแล้ว"
+     billed/paid/due = เงินสดที่ต้องโอน (หักประกันแล้ว)
+     retentionAll = ประกันที่หักไว้ทุกงวดที่เบิก · retention = เฉพาะงวดที่โอนแล้ว */
+  const gross = rows.reduce((s,p)=>s+Number(p.amount||0)+Number(p.vat||0),0);
+  const retentionAll = rows.reduce((s,p)=>s+Number(p.retention||0),0);
+  const paidBase = rows.filter(isPaid).reduce((s,p)=>s+Number(p.amount||0),0);
+  return {rows,billed,paid,due,base,rest,retention,retentionAll,gross,paidBase,pct,count:rows.length};
 }
 /* กำหนดคืนเงินประกันผลงาน = ส่งมอบงาน + 1 ปี (สัญญาข้อ 4.3) */
 function retentionDue(c){
   if(!c.handoverDate) return "";
   const d=new Date(c.handoverDate+"T00:00:00"); if(isNaN(d)) return "";
-  d.setFullYear(d.getFullYear()+1); return isoLocal(d);
+  const dd=d.getDate(); d.setFullYear(d.getFullYear()+1);
+  if(d.getDate()!==dd) d.setDate(0);          /* 29 ก.พ. → 28 ก.พ. ไม่ใช่ 1 มี.ค. */
+  return isoLocal(d);
 }
 function warrantyEnd(c,years){
   if(!c.handoverDate) return "";
   const d=new Date(c.handoverDate+"T00:00:00"); if(isNaN(d)) return "";
-  d.setFullYear(d.getFullYear()+years); return isoLocal(d);
+  const dd=d.getDate(); d.setFullYear(d.getFullYear()+Number(years||0));
+  if(d.getDate()!==dd) d.setDate(0);
+  return isoLocal(d);
 }
 function totals(){
-  const t={contract:0,billed:0,paid:0,due:0,extra:0,extraPaid:0};
-  S.contracts.forEach(c=>{const s=contractStats(c);t.contract+=contractTotal(c);t.billed+=s.billed;t.paid+=s.paid;t.due+=s.due;
-    t.base=(t.base||0)+Number(c.amount||0); t.baseBilled=(t.baseBilled||0)+s.base; t.retention=(t.retention||0)+s.retention;});
+  const t={contract:0,billed:0,paid:0,due:0,extra:0,extraPaid:0,
+           base:0,baseBilled:0,gross:0,retention:0,retentionAll:0};
+  S.contracts.forEach(c=>{const s=contractStats(c);
+    t.contract+=contractTotal(c); t.billed+=s.billed; t.paid+=s.paid; t.due+=s.due;
+    t.base+=Number(c.amount||0); t.baseBilled+=s.base; t.gross+=s.gross;
+    t.retention+=s.retention; t.retentionAll+=s.retentionAll;});
   S.extras.forEach(x=>{t.extra+=paidNet(x); if(isPaid(x)) t.extraPaid+=paidNet(x);});
   return t;
 }
@@ -145,13 +159,23 @@ function avgPayLag(){
   const lags = S.payments.filter(p=>p.paidDate&&p.reqDate).map(p=>daysBetween(p.reqDate,p.paidDate)).filter(n=>n!=null);
   return lags.length? Math.round(lags.reduce((a,b)=>a+b,0)/lags.length) : null;
 }
+/* สัญญาหลักที่ใช้อ้างอิงกำหนดแล้วเสร็จของโครงการ (อาคาร 3 ชั้น) */
+const mainContract = () => S.contracts.find(c=>c.id==="c2") || S.contracts.find(c=>c.durationDays) || S.contracts[0];
+/* คำขอขยายเวลาของสัญญานั้นเท่านั้น — EOT ของสัญญาอื่นต้องไม่ไปยืดกำหนดของสัญญานี้ */
+function eotsOf(status){
+  const c = mainContract(); if(!c) return [];
+  return S.eots.filter(e=>e.status===status && (!e.contractId || e.contractId===c.id))
+               .sort((a,b)=>(a.newEnd||"").localeCompare(b.newEnd||""));
+}
 function currentEnd(){
-  const ok = S.eots.filter(e=>e.status==="อนุมัติแล้ว").sort((a,b)=>(a.newEnd||"").localeCompare(b.newEnd||""));
-  const base = S.contracts.find(c=>c.id==="c2")?.endDate || "2027-04-15";
-  return ok.length? ok[ok.length-1].newEnd : base;
+  const c = mainContract(), ok = eotsOf("อนุมัติแล้ว");
+  const base = (c && c.endDate) || "";
+  const last = ok.length ? ok[ok.length-1].newEnd : "";
+  if(!last) return base;
+  return (!base || last > base) ? last : base;
 }
 function pendingEnd(){
-  const p = S.eots.filter(e=>e.status==="รออนุมัติ").sort((a,b)=>(a.newEnd||"").localeCompare(b.newEnd||""));
+  const p = eotsOf("รออนุมัติ");
   return p.length? p[p.length-1].newEnd : null;
 }
 const filesFor = (t,id) => S.files.filter(f=>f.refType===t&&f.refId===id);
@@ -268,10 +292,14 @@ function guessType(name,refType){
 /* เอกสารที่ "ต้องมี" ของแต่ละรายการ ขึ้นกับสถานะของรายการนั้น */
 function requiredDocs(rt,rec){
   if(rt==="payment"||rt==="extra") return rec.paidDate?["invoice","report","slip"]:["invoice","report"];
-  if(rt==="rfa"){ if(!rec.submitDate) return [];
-    return ["อนุมัติแล้ว","อนุมัติตามหมายเหตุ","ไม่อนุมัติ","ให้แก้ไข/ยื่นใหม่"].includes(rec.status)?["form","result"]:["form"]; }
+  if(rt==="rfa"){
+    const decided = ["อนุมัติแล้ว","อนุมัติตามหมายเหตุ","ไม่อนุมัติ","ให้แก้ไข/ยื่นใหม่"].includes(rec.status);
+    if(!rec.submitDate && !decided) return [];      /* ยังไม่ยื่นและยังไม่มีผล = ยังไม่ต้องมีเอกสาร */
+    return decided ? ["form","result"] : ["form"]; }
   if(rt==="contract") return ["contract"];
-  if(rt==="eot") return rec.decisionDate?["letter","result"]:["letter"];
+  if(rt==="eot"){
+    const decided = rec.decisionDate || ["อนุมัติแล้ว","ไม่อนุมัติ"].includes(rec.status);
+    return decided?["letter","result"]:["letter"]; }
   return [];
 }
 function docState(rt,rec){
@@ -292,9 +320,11 @@ function docChip(rt,rec){
   const extra=st.files.filter(f=>!shown.includes(f.docType||"other")).length;
   if(st.confirmed) return '<button class="docchip" data-files="'+rt+':'+rec.id+'" title="ยืนยันเอกสารครบแล้ว">'+
     '<i class="on" title="ยืนยันเอกสารครบแล้ว">✓</i></button>';
-  return '<button class="docchip" data-files="'+rt+':'+rec.id+'" title="จัดการเอกสารแนบ">'+
+  const anyRequired = st.need.length>0;
+  return '<button class="docchip" data-files="'+esc(rt+':'+rec.id)+'" title="จัดการเอกสารแนบ">'+
     shown.map(t=>{const m=docMeta(rt,t);
-      return '<i class="'+(st.have.has(t)?"on":"miss")+'" title="'+esc(m[1])+'">'+m[2]+'</i>';}).join("")+
+      const cls = st.have.has(t) ? "on" : (anyRequired && st.missing.includes(t) ? "miss" : "opt");
+      return '<i class="'+cls+'" title="'+esc(m[1])+'">'+m[2]+'</i>';}).join("")+
     (extra?'<span class="xtra">+'+extra+'</span>':'')+'</button>';
 }
 function missingLabel(rt,rec){
@@ -448,14 +478,14 @@ function viewDash(){
       '<div class="hero-lab">ยอดค้างจ่าย ณ วันนี้</div>'+
       '<div class="hero-fig">'+money(dueTotal)+'<small>บาท</small></div>'+
       '<div class="hero-sub">'+
-        '<button class="golink" data-go="pay" data-gs="due">'+dueRows.length+' รายการที่เบิกแล้วยังไม่ได้โอน</button>'+
+        '<button class="golink" data-go="pay">'+dueRows.length+' รายการที่เบิกแล้วยังไม่ได้โอน</button>'+
         (overdue.length?' · <button class="golink warn" data-go="pay" data-gs="late">เลยกำหนดจ่ายแล้ว '+overdue.length+
           ' รายการ ('+money(overdueSum)+' บาท)</button>':' · ยังไม่มีรายการเลยกำหนด')+
       '</div>'+
     '</div>'+
     '<div class="hero-split">'+
       S.contracts.map(c=>{const st=contractStats(c); if(!st.due) return "";
-        return '<div class="hs-row go" role="button" tabindex="0" data-go="pay" data-gc="'+c.id+'" data-gs="due">'+
+        return '<div class="hs-row go" role="button" tabindex="0" data-go="pay" data-gc="'+esc(c.id)+'">'+
           '<span class="hs-nm">'+esc(c.code)+'</span>'+
           '<span class="hs-bar"><i style="width:'+Math.round(st.due/Math.max(1,dueTotal)*100)+'%"></i></span>'+
           '<span class="hs-val num">'+money(st.due)+'</span></div>';}).join("")+
@@ -548,10 +578,13 @@ function viewDash(){
     kpi("lead","มูลค่าสัญญารวม",money(t.contract),"บาท",
       "เนื้องาน "+money(t.base)+" + VAT · "+S.contracts.length+" สัญญา · งานเพิ่ม "+money(t.extra)+" บาท",
       ' data-go="setup"')+
-    kpi("","เบิกแล้วสะสม",money(t.billed+t.extra),"บาท",
-      "เนื้องานที่เบิกแล้ว "+(t.baseBilled/Math.max(1,t.base)*100).toFixed(1)+"% ของเนื้องานตามสัญญา",
+    kpi("","เบิกแล้วสะสม",money(t.gross+t.extra),"บาท",
+      "ตามใบเบิก (รวม VAT ก่อนหักประกัน) · เนื้องานที่เบิกแล้ว "+
+      (t.base?(t.baseBilled/t.base*100).toFixed(1):"0.0")+"% ของเนื้องานตามสัญญา",
       ' data-go="pay"')+
-    kpi("","จ่ายแล้ว",money(t.paid+t.extraPaid),"บาท","เงินประกันผลงานที่หักไว้แล้ว "+money(t.retention||0)+" บาท",
+    kpi("","โอนแล้วจริง",money(t.paid+t.extraPaid),"บาท",
+      "หักประกันผลงานไว้แล้ว "+money(t.retention||0)+" บาท"+
+      (t.retentionAll>t.retention?" · รอโอนอีก "+money(t.retentionAll-t.retention)+" บาทที่หักจากงวดที่ยังไม่จ่าย":""),
       ' data-go="pay" data-gs="paid"')+
     kpi(left<90?"bad":"","กำหนดแล้วเสร็จ",thDate(end),"",
       (left>=0?"เหลืออีก "+left+" วัน":"เลยกำหนด "+Math.abs(left)+" วัน")+" · ขยายแล้ว "+approved+" วัน"+
@@ -617,9 +650,11 @@ function viewDash(){
 }
 function timelineHTML(){
   const items=[];
-  const first=S.payments.filter(p=>p.paidDate).sort((a,b)=>a.paidDate.localeCompare(b.paidDate))[0];
+  const mc = mainContract();
+  const first=S.payments.filter(p=>p.paidDate && (!mc||p.contractId===mc.id))
+                        .sort((a,b)=>a.paidDate.localeCompare(b.paidDate))[0];
   if(first) items.push({d:first.paidDate,t:"เริ่มต้นสัญญา / จ่ายงวดเซ็นสัญญา",b:"โอนงวดแรก "+money(paidNet(first))+" บาท",k:"milestone"});
-  const base=S.contracts.find(c=>c.id==="c2");
+  const base=mc;
   if(base&&base.endDate) items.push({d:base.endDate,t:"กำหนดแล้วเสร็จตามสัญญาเดิม",b:"ตามสัญญาก่อสร้างฉบับเดิม",k:"milestone"});
   S.eots.forEach(e=>{
     items.push({d:e.submitDate,t:"ยื่นขอขยายเวลาครั้งที่ "+e.no+" ("+e.docNo+")",
@@ -671,7 +706,7 @@ function viewPay(){
     const s=contractStats(c);
     return '<div class="card" style="margin-bottom:14px"><div class="card-h">'+
       '<h3>'+esc(c.code)+' — '+esc(c.name)+'</h3>'+
-      '<span class="hint">'+esc(c.contractor)+' · สัญญา '+money(c.amount)+' บาท'+(c.vat?" · VAT 7%":" · ไม่มี VAT")+
+      '<span class="hint">'+esc(c.contractor)+' · สัญญา '+money(c.amount)+' บาท'+(c.vat?" · VAT "+c.vat+"%":" · ไม่มี VAT")+
       (c.retention?" · หักประกัน "+c.retention+"%":"")+'</span></div>'+
       '<div class="tablewrap"><table><thead><tr>'+
       '<th class="c">งวด</th><th>รายละเอียดงาน</th><th class="r">มูลค่างวด</th><th class="r">VAT</th>'+
@@ -692,10 +727,17 @@ function viewPay(){
           '<td><div class="rowacts"><button class="btn ghost sm" data-edit="pay:'+p.id+'">แก้ไข</button>'+
           '<button class="btn ghost sm" data-del="pay:'+p.id+'">ลบ</button></div></td></tr>';
       }).join("")+
-      '</tbody><tfoot><tr><td colspan="5" class="r" style="font-weight:600">รวมของสัญญานี้</td>'+
-      '<td class="r num" style="font-weight:700">'+money(s.billed)+'</td>'+
-      '<td colspan="3" class="muted">จ่ายแล้ว '+money(s.paid)+' · ค้าง '+money(s.due)+'</td>'+
-      '<td colspan="3"></td></tr></tfoot></table></div></div>';
+      (function(){
+        const filtered = !!(f.status||f.q);
+        const shownSum = rows.reduce((a,p)=>a+paidNet(p),0);
+        const shownPaid = rows.filter(isPaid).reduce((a,p)=>a+paidNet(p),0);
+        const shownDue  = shownSum-shownPaid;
+        return '</tbody><tfoot><tr><td colspan="5" class="r" style="font-weight:600">'+
+        (filtered? 'รวมเฉพาะที่แสดง ('+rows.length+' งวด)' : 'รวมของสัญญานี้')+'</td>'+
+        '<td class="r num" style="font-weight:700">'+money(shownSum)+'</td>'+
+        '<td colspan="3" class="muted">จ่ายแล้ว '+money(shownPaid)+' · ค้าง '+money(shownDue)+'</td>'+
+        '<td colspan="3"></td></tr></tfoot></table></div></div>';
+      })();
   }).join("");
   $("#view").innerHTML=filterBar+(groups||'<div class="card"><div class="empty">ไม่พบรายการตามเงื่อนไขที่เลือก</div></div>');
   if(S._focusQ){ const i=$('[data-filter="q"]'); if(i){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); } S._focusQ=false; }
@@ -974,7 +1016,7 @@ function viewDocs(){
   /* ชื่อรายการที่ไฟล์ผูกอยู่ */
   const refInfo=f=>{
     if(f.refType==="payment"){ const p=S.payments.find(x=>x.id===f.refId); const c=p&&contractOf(p);
-      return p?{group:(c?c.code:"—")+" · งวดที่ "+p.seq, sub:(p.invoice||"")+" · "+esc(String(p.detail||"").slice(0,60)), key:"payment:"+p.id}
+      return p?{group:(c?c.code:"—")+" · งวดที่ "+p.seq, sub:(p.invoice||"")+" · "+String(p.detail||"").slice(0,60), key:"payment:"+p.id}
               :{group:"งวดงานที่ถูกลบ",sub:"",key:"x"}; }
     if(f.refType==="extra"){ const x=S.extras.find(v=>v.id===f.refId);
       return x?{group:"งานเพิ่ม · "+x.building, sub:x.invoice||"", key:"extra:"+x.id}:{group:"งานเพิ่มที่ถูกลบ",sub:"",key:"x"}; }
@@ -1054,7 +1096,7 @@ function viewDocs(){
       '<div class="card"><div class="empty">ไม่พบเอกสารตามเงื่อนไขที่เลือก</div></div>'
      : sorted.map(g=>
         '<div class="card docgroup"><div class="card-h">'+
-        '<div><h3>'+esc(g.info.group)+'</h3>'+(g.info.sub?'<div class="muted" style="font-size:12.5px">'+g.info.sub+'</div>':'')+'</div>'+
+        '<div><h3>'+esc(g.info.group)+'</h3>'+(g.info.sub?'<div class="muted" style="font-size:12.5px">'+esc(g.info.sub)+'</div>':'')+'</div>'+
         '<span class="hint">'+g.files.length+' ไฟล์ · '+
         '<button class="btn ghost sm" data-files="'+g.info.key+'">จัดการเอกสาร</button></span></div>'+
         '<div class="card-b" style="padding:6px 16px 12px">'+g.files.map(fileRow).join("")+'</div></div>').join(""));
@@ -1077,8 +1119,9 @@ function viewSetup(){
       '<span>จำนวนงวด <b>'+(c.periods||"—")+'</b></span>'+
       '<span>VAT <b>'+(c.vat?c.vat+"%":"ไม่มี")+'</b></span>'+
       '<span>หักประกัน <b>'+(c.retention?c.retention+"%":"ไม่มี")+'</b></span></div>'+
-      '<div class="bar"><span style="width:'+Math.min(100,s.billed/Math.max(1,c.amount)*100)+'%"></span></div>'+
-      '<div class="muted" style="font-size:13.5px;margin-top:6px">เบิกแล้ว '+money(s.billed)+' บาท · คงเหลือ '+money(s.rest)+' บาท</div>'+
+      '<div class="bar"><span style="width:'+s.pct.toFixed(1)+'%"></span></div>'+
+      '<div class="muted" style="font-size:13.5px;margin-top:6px">เนื้องานที่เบิกแล้ว '+money(s.base)+
+      ' บาท · คงเหลือ '+money(s.rest)+' บาท ('+s.pct.toFixed(0)+'%)</div>'+
       (c.endDate?'<div style="font-size:14px;margin-top:8px">กำหนดแล้วเสร็จตามสัญญา <b class="num">'+thDateFull(c.endDate)+'</b></div>':'')+
       (c.dueDay?'<div style="font-size:14px;margin-top:4px">ครบกำหนดจ่ายทุกวันที่ <b class="num">'+esc(c.dueDay)+'</b> ของเดือน</div>':'')+
       ((c.inspectDays||c.payDays)?'<div style="font-size:14px;margin-top:4px">ตรวจงานภายใน <b class="num">'+esc(c.inspectDays||"—")+
@@ -1482,8 +1525,15 @@ function allRows(){
   out.push([],["ทะเบียนงานขออนุมัติ (RFA)"]); rfaRows().forEach(r=>out.push(r));
   out.push([],["รายงานการขอขยายระยะเวลาก่อสร้าง"],["ครั้งที่","เลขที่เอกสาร","วันที่ยื่น","จำนวนวัน","สิ้นสุดเดิม","สิ้นสุดใหม่","สถานะ","เหตุผล"]);
   S.eots.forEach(e=>out.push([e.no,e.docNo,thDateFull(e.submitDate),e.days,thDateFull(e.oldEnd),thDateFull(e.newEnd),e.status,e.reason]));
-  out.push([],["สรุป"],["มูลค่าสัญญารวม",t.contract],["เบิกแล้วสะสม",t.billed+t.extra],["จ่ายแล้ว",t.paid+t.extraPaid],
-    ["ค้างจ่าย",t.due],["กำหนดแล้วเสร็จปัจจุบัน",thDateFull(currentEnd())]);
+  const extraDue = S.extras.filter(x=>!isPaid(x)).reduce((a,x)=>a+paidNet(x),0);
+  out.push([],["สรุป"],
+    ["มูลค่าสัญญารวม (รวม VAT)",t.contract],
+    ["เบิกแล้วสะสม ตามใบเบิก",t.gross+t.extra],
+    ["โอนแล้วจริง",t.paid+t.extraPaid],
+    ["ค้างจ่าย",t.due+extraDue],
+    ["เงินประกันที่หักไว้ทั้งหมด",t.retentionAll],
+    ["  — จากงวดที่โอนแล้ว",t.retention],
+    ["กำหนดแล้วเสร็จปัจจุบัน",thDateFull(currentEnd())]);
   return out;
 }
 
@@ -1622,8 +1672,9 @@ function showConfigHelp(){
     '<code>SUPABASE_URL</code> และ <code>SUPABASE_ANON_KEY</code> ของโปรเจกต์ จากหน้า Project Settings → API</p>'+
     '</div></div>';
 }
-document.addEventListener("click",e=>{
-  if(e.target.id==="logoutBtn"){ Store.signOut(); location.reload(); }
+document.addEventListener("click",async e=>{
+  /* ต้องรอให้ signOut เคลียร์เซสชันเสร็จก่อน ไม่งั้นรีโหลดแล้วยังล็อกอินค้างอยู่ */
+  if(e.target.id==="logoutBtn"){ try{ await Store.signOut(); }catch(err){} location.reload(); return; }
 });
 renderAll();
 boot();
