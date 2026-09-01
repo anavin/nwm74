@@ -296,6 +296,9 @@ td.c,th.c{text-align:center}
 .docslot header .btn+.btn{margin-left:6px}
 .docslot .filerow:last-child{border-bottom:0;padding-bottom:0}
 
+.ctr-terms{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);display:grid;gap:6px;font-size:13px}
+.ctr-terms div{display:flex;justify-content:space-between;gap:12px}
+.ctr-terms span{color:var(--ink-3)}
 .ctr-docs{display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);flex-wrap:wrap}
 
 /* ---------- แถวงานที่ต้องติดตาม ---------- */

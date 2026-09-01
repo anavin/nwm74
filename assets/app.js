@@ -54,9 +54,27 @@ function rfaState(r){
 const paidNet = p => Number(p.amount||0)+Number(p.vat||0)-Number(p.retention||0)-Number(p.discount||0);
 const isPaid = r => !!r.paidDate;
 function contractOf(r){ return S.contracts.find(c=>c.id===r.contractId); }
+/* บวกวันทำการ (ข้ามเสาร์-อาทิตย์ ยังไม่รวมวันหยุดนักขัตฤกษ์) */
+function addWorkdays(iso,n){
+  if(!iso) return "";
+  const d=new Date(iso+"T00:00:00"); if(isNaN(d)) return "";
+  let left=Number(n||0);
+  while(left>0){ d.setDate(d.getDate()+1); const w=d.getDay(); if(w!==0&&w!==6) left--; }
+  return d.toISOString().slice(0,10);
+}
+const vatRate = c => Number(c&&c.vat||0)/100;
+/* มูลค่าสัญญา: amount = เนื้องาน (ก่อน VAT) · total = รวม VAT */
+const contractTotal = c => Number(c&&c.amount||0)*(1+vatRate(c));
+/* วันที่ CM ต้องตรวจงานให้เสร็จ */
+function inspectDueOf(r){
+  const c=contractOf(r);
+  return (c&&c.inspectDays&&r.reqDate)? addWorkdays(r.reqDate,c.inspectDays) : "";
+}
 /* วันครบกำหนดจ่าย: ถ้าสัญญากำหนด "จ่ายทุกวันที่ N ของเดือน" ให้ใช้วันที่ N ครั้งถัดไปนับจากวันที่ยื่นเบิก */
 function dueDateOf(r){
   const c=contractOf(r), d=Number(c&&c.dueDay||0);
+  /* แบบที่ 2: จ่ายภายใน N วันทำการ นับจากวันที่รับรองผลตรวจ (ตามสัญญาข้อ 3) */
+  if(!d && c && c.payDays && r.certDate) return addWorkdays(r.certDate, c.payDays);
   if(!d || !r.reqDate) return "";
   const t=new Date(r.reqDate+"T00:00:00"); if(isNaN(t)) return "";
   const mk=(y,m)=>{ const last=new Date(y,m+1,0).getDate(); return new Date(y,m,Math.min(d,last)); };
@@ -77,22 +95,45 @@ function pstatus(r){
   return (age!=null && age>30) ? "late" : "due";
 }
 function dueNote(r){
-  const due=dueDateOf(r); if(!due) return "";
+  const due=dueDateOf(r);
+  if(!due){
+    const insp=inspectDueOf(r);
+    if(insp && !r.certDate){
+      const n=daysBetween(insp);
+      return n>0 ? "รอผลตรวจ — CM เกินกำหนดตรวจ "+n+" วัน" : "รอผลตรวจ — CM ต้องตรวจให้เสร็จภายใน "+thDate(insp);
+    }
+    return "";
+  }
   const n=daysBetween(due);
   return n>0 ? "เลยกำหนด "+n+" วัน" : n===0 ? "ครบกำหนดวันนี้" : "ครบกำหนด "+thDate(due)+" (อีก "+Math.abs(n)+" วัน)";
 }
 const statusLabel = s => s==="paid"?"จ่ายแล้ว":s==="late"?"เลยกำหนดจ่าย":"ค้างจ่าย";
 function contractStats(c){
   const rows = S.payments.filter(p=>p.contractId===c.id);
-  const billed = rows.reduce((s,p)=>s+paidNet(p),0);
+  const billed = rows.reduce((s,p)=>s+paidNet(p),0);          // ยอดเงินสดที่เบิกแล้ว (รวม VAT − ประกัน)
   const paid = rows.filter(isPaid).reduce((s,p)=>s+paidNet(p),0);
   const due = billed-paid;
-  const rest = Math.max(0, Number(c.amount||0)-rows.reduce((s,p)=>s+Number(p.amount||0),0));
-  return {rows,billed,paid,due,rest,count:rows.length};
+  const base = rows.reduce((s,p)=>s+Number(p.amount||0),0);   // เนื้องานที่เบิกแล้ว (ก่อน VAT)
+  const rest = Math.max(0, Number(c.amount||0)-base);         // เนื้องานคงเหลือ (ก่อน VAT)
+  const retention = rows.filter(isPaid).reduce((s,p)=>s+Number(p.retention||0),0);
+  const pct = Math.min(100, base/Math.max(1,Number(c.amount||0))*100);
+  return {rows,billed,paid,due,base,rest,retention,pct,count:rows.length};
+}
+/* กำหนดคืนเงินประกันผลงาน = ส่งมอบงาน + 1 ปี (สัญญาข้อ 4.3) */
+function retentionDue(c){
+  if(!c.handoverDate) return "";
+  const d=new Date(c.handoverDate+"T00:00:00"); if(isNaN(d)) return "";
+  d.setFullYear(d.getFullYear()+1); return d.toISOString().slice(0,10);
+}
+function warrantyEnd(c,years){
+  if(!c.handoverDate) return "";
+  const d=new Date(c.handoverDate+"T00:00:00"); if(isNaN(d)) return "";
+  d.setFullYear(d.getFullYear()+years); return d.toISOString().slice(0,10);
 }
 function totals(){
   const t={contract:0,billed:0,paid:0,due:0,extra:0,extraPaid:0};
-  S.contracts.forEach(c=>{const s=contractStats(c);t.contract+=Number(c.amount||0);t.billed+=s.billed;t.paid+=s.paid;t.due+=s.due;});
+  S.contracts.forEach(c=>{const s=contractStats(c);t.contract+=contractTotal(c);t.billed+=s.billed;t.paid+=s.paid;t.due+=s.due;
+    t.base=(t.base||0)+Number(c.amount||0); t.baseBilled=(t.baseBilled||0)+s.base; t.retention=(t.retention||0)+s.retention;});
   S.extras.forEach(x=>{t.extra+=paidNet(x); if(isPaid(x)) t.extraPaid+=paidNet(x);});
   return t;
 }
@@ -345,7 +386,8 @@ function viewDash(){
         '<div class="muted" style="font-size:13px">'+esc((r.rec.detail||"").slice(0,70))+'</div></td>'+
         '<td data-l="เลขที่ใบเบิก" class="num">'+esc(r.invoice||"—")+'</td>'+
         '<td data-l="ยื่นเมื่อ" class="num">'+thDate(r.date)+'</td>'+
-        '<td data-l="ครบกำหนดจ่าย" class="num">'+(r.due?thDate(r.due):'<span class="muted">ตามที่ตกลง</span>')+'</td>'+
+        '<td data-l="ครบกำหนดจ่าย" class="num">'+(r.due?thDate(r.due):
+          '<span class="muted">'+(r.rt==="payment"&&inspectDueOf(r.rec)&&!r.rec.certDate?"รอผลตรวจ":"ตามที่ตกลง")+'</span>')+'</td>'+
         '<td data-l="สถานะเวลา" style="min-width:150px"><div class="agewrap"><span class="agebar'+(late?" late":"")+'">'+
           '<i style="width:'+Math.min(100,Math.max(4,Math.round(Math.abs(r.age||0)/maxAge*100)))+'%"></i></span>'+
           '<b class="num'+(late?" agelate":"")+'">'+(r.age==null?"—":
@@ -362,9 +404,11 @@ function viewDash(){
 
   /* ============ ตัวเลขรอง ============ */
   '<div class="grid kpis" style="margin-bottom:16px">'+
-    kpi("lead","มูลค่าสัญญารวม",money(t.contract),"บาท",S.contracts.length+" สัญญา · งานเพิ่ม "+money(t.extra)+" บาท")+
-    kpi("","เบิกแล้วสะสม",money(t.billed+t.extra),"บาท",((t.billed+t.extra)/Math.max(1,t.contract)*100).toFixed(1)+"% ของมูลค่าสัญญา")+
-    kpi("","จ่ายแล้ว",money(t.paid+t.extraPaid),"บาท","คงเหลือตามสัญญา "+money(t.contract-t.billed)+" บาท")+
+    kpi("lead","มูลค่าสัญญารวม",money(t.contract),"บาท",
+      "เนื้องาน "+money(t.base)+" + VAT · "+S.contracts.length+" สัญญา · งานเพิ่ม "+money(t.extra)+" บาท")+
+    kpi("","เบิกแล้วสะสม",money(t.billed+t.extra),"บาท",
+      "เนื้องานที่เบิกแล้ว "+(t.baseBilled/Math.max(1,t.base)*100).toFixed(1)+"% ของเนื้องานตามสัญญา")+
+    kpi("","จ่ายแล้ว",money(t.paid+t.extraPaid),"บาท","เงินประกันผลงานที่หักไว้แล้ว "+money(t.retention||0)+" บาท")+
     kpi(left<90?"bad":"","กำหนดแล้วเสร็จ",thDate(end),"",
       (left>=0?"เหลืออีก "+left+" วัน":"เลยกำหนด "+Math.abs(left)+" วัน")+" · ขยายแล้ว "+approved+" วัน"+
       (waiting?" (รออนุมัติอีก "+waiting+" วัน)":""))+
@@ -378,18 +422,19 @@ function viewDash(){
     '<div class="card"><div class="card-h"><h3>ความคืบหน้าการเบิกจ่ายรายสัญญา</h3>'+
       '<span class="hint">สัดส่วนของมูลค่าสัญญา</span></div><div class="card-b">'+
       S.contracts.map(c=>{
-        const st=contractStats(c), amt=Number(c.amount||1);
+        const st=contractStats(c), amt=Math.max(1,contractTotal(c));
         const wp=Math.min(100,st.paid/amt*100), wd=Math.min(100,st.due/amt*100);
         return '<div class="ctr-row"><div class="ctr-head"><div><div class="nm">'+esc(c.code)+' — '+esc(c.name)+'</div>'+
           '<div class="who">'+esc(c.contractor)+'</div></div>'+
-          '<div class="num" style="font-weight:600">'+money(c.amount)+' <span class="muted" style="font-weight:400">บาท</span></div></div>'+
+          '<div class="num" style="font-weight:600">'+money(contractTotal(c))+
+          ' <span class="muted" style="font-weight:400">บาท'+(c.vat?" (รวม VAT)":"")+'</span></div></div>'+
           '<div class="meter"><span class="s-paid" style="width:'+wp+'%"></span>'+
           '<span class="s-due" style="width:'+wd+'%"></span>'+
           '<span class="s-un" style="width:'+Math.max(0,100-wp-wd)+'%"></span></div>'+
           '<div class="ctr-figs"><span>จ่ายแล้ว <b>'+money(st.paid)+'</b></span>'+
           '<span>ค้างจ่าย <b'+(st.due?' style="color:var(--due)"':'')+'>'+money(st.due)+'</b></span>'+
-          '<span>ยังไม่เบิก <b>'+money(st.rest)+'</b></span>'+
-          '<span class="muted">'+st.count+'/'+(c.periods||"—")+' งวด</span></div></div>';
+          '<span>เนื้องานคงเหลือ <b>'+money(st.rest)+'</b></span>'+
+          '<span class="muted">'+st.count+'/'+(c.periods||"—")+' งวด · เบิกแล้ว '+st.pct.toFixed(0)+'%</span></div></div>';
       }).join("")+
       '<div class="legend"><span><i style="background:var(--fill-paid)"></i>จ่ายแล้ว</span>'+
       '<span><i style="background:var(--fill-due)"></i>เบิกแล้วรอโอน</span>'+
@@ -399,7 +444,13 @@ function viewDash(){
     '<div style="display:grid;gap:14px">'+
       '<div class="card"><div class="card-h"><h3>ต้องติดตาม</h3><span class="hint">งานอนุมัติและเวลา</span></div>'+
       '<div class="card-b" style="display:grid;gap:12px">'+
-        ((S.eots.filter(e=>e.status==="รออนุมัติ").map(e=>
+        (S.payments.filter(p=>!isPaid(p)&&!p.certDate&&inspectDueOf(p)&&daysBetween(inspectDueOf(p))>0).slice(0,3).map(p=>{
+        const c=contractOf(p), n=daysBetween(inspectDueOf(p));
+        return '<div class="tk"><span class="pill late">ตรวจช้า '+n+' วัน</span>'+
+          '<div><div class="tk-t">รอ CM รับรองผลตรวจ · '+esc(p.invoice||"")+'</div>'+
+          '<div class="tk-s">'+esc(c?c.code:"")+' งวดที่ '+p.seq+' · ครบกำหนดตรวจ '+thDate(inspectDueOf(p))+'</div></div></div>';
+      }).join(""))+
+      ((S.eots.filter(e=>e.status==="รออนุมัติ").map(e=>
           '<div class="tk"><span class="pill due">รออนุมัติ</span>'+
           '<div><div class="tk-t">ขอขยายเวลาครั้งที่ '+e.no+' · '+esc(e.docNo)+'</div>'+
           '<div class="tk-s">ยื่น '+thDate(e.submitDate)+' · ขอ '+e.days+' วัน · ค้าง '+(daysBetween(e.submitDate)||0)+' วันแล้ว</div></div></div>').join("")+
@@ -599,7 +650,11 @@ function viewEot(){
     const n=filesFor("eot",e.id).length, ok=e.status==="อนุมัติแล้ว";
     return '<tr><td data-l="ครั้งที่" class="c stripe '+(ok?"paid":"due")+' num" style="font-weight:600">'+e.no+'</td>'+
       '<td data-l="เหตุผล / สาเหตุ" style="min-width:300px">'+esc(e.reason)+(e.note?'<div class="muted" style="font-size:13px">'+esc(e.note)+'</div>':'')+'</td>'+
-      '<td data-l="เลขที่เอกสาร" class="num">'+esc(e.docNo)+'</td><td data-l="วันที่ยื่น" class="num">'+thDate(e.submitDate)+'</td>'+
+      '<td data-l="เลขที่เอกสาร" class="num">'+esc(e.docNo)+'</td>'+
+      '<td data-l="วันที่ยื่น" class="num">'+thDate(e.submitDate)+
+      (e.eventDate?'<div class="muted" style="font-size:12px">เหตุเกิด '+thDate(e.eventDate)+
+        ' · '+((daysBetween(e.eventDate,e.submitDate)||0)<=15?'<span style="color:var(--paid)">แจ้งใน 15 วัน ✓</span>':
+        '<span style="color:var(--late)">เกิน 15 วัน ('+daysBetween(e.eventDate,e.submitDate)+' วัน)</span>')+'</div>':'')+'</td>'+
       '<td data-l="ขอขยาย (วัน)" class="c num" style="font-weight:600">'+e.days+'</td><td data-l="รวมสะสม" class="c num">'+acc+'</td>'+
       '<td data-l="สิ้นสุดเดิม" class="num">'+thDate(e.oldEnd)+'</td><td data-l="สิ้นสุดใหม่" class="num" style="font-weight:600">'+thDate(e.newEnd)+'</td>'+
       '<td data-l="สถานะ" class="c"><span class="pill '+(ok?"paid":"due")+'">'+esc(e.status)+'</span>'+
@@ -791,7 +846,8 @@ function viewSetup(){
       '<button class="btn ghost sm" data-edit="contract:'+c.id+'">แก้ไข</button></div><div class="card-b">'+
       '<div style="font-weight:600">'+esc(c.name)+'</div>'+
       '<div class="muted" style="font-size:14px;margin-bottom:10px">'+esc(c.contractor)+'</div>'+
-      '<div class="ctr-figs" style="margin:0 0 10px"><span>มูลค่าสัญญา <b>'+money(c.amount)+'</b></span>'+
+      '<div class="ctr-figs" style="margin:0 0 10px"><span>เนื้องานตามสัญญา <b>'+money(c.amount)+'</b></span>'+
+      (c.vat?'<span>รวม VAT <b>'+money(contractTotal(c))+'</b></span>':'')+
       '<span>จำนวนงวด <b>'+(c.periods||"—")+'</b></span>'+
       '<span>VAT <b>'+(c.vat?c.vat+"%":"ไม่มี")+'</b></span>'+
       '<span>หักประกัน <b>'+(c.retention?c.retention+"%":"ไม่มี")+'</b></span></div>'+
@@ -799,6 +855,19 @@ function viewSetup(){
       '<div class="muted" style="font-size:13.5px;margin-top:6px">เบิกแล้ว '+money(s.billed)+' บาท · คงเหลือ '+money(s.rest)+' บาท</div>'+
       (c.endDate?'<div style="font-size:14px;margin-top:8px">กำหนดแล้วเสร็จตามสัญญา <b class="num">'+thDateFull(c.endDate)+'</b></div>':'')+
       (c.dueDay?'<div style="font-size:14px;margin-top:4px">ครบกำหนดจ่ายทุกวันที่ <b class="num">'+esc(c.dueDay)+'</b> ของเดือน</div>':'')+
+      ((c.inspectDays||c.payDays)?'<div style="font-size:14px;margin-top:4px">ตรวจงานภายใน <b class="num">'+esc(c.inspectDays||"—")+
+        '</b> วันทำการ · จ่ายภายใน <b class="num">'+esc(c.payDays||"—")+'</b> วันทำการหลังรับรองผลตรวจ</div>':'')+
+      (c.startDate?'<div style="font-size:14px;margin-top:4px">เริ่มงาน <b class="num">'+thDateFull(c.startDate)+'</b>'+
+        (c.durationDays?' · ระยะเวลา <b class="num">'+esc(c.durationDays)+'</b> วัน':'')+'</div>':'')+
+      (c.penaltyDay?'<div style="font-size:14px;margin-top:4px">ค่าปรับล่าช้า <b class="num">'+money(c.penaltyDay)+'</b> บาท/วัน</div>':'')+
+      '<div class="ctr-terms">'+
+        '<div><span>เงินประกันผลงานที่หักแล้ว</span><b class="num">'+money(s.retention)+' บาท</b></div>'+
+        '<div><span>กำหนดคืนเงินประกัน</span><b class="num">'+(retentionDue(c)?thDateFull(retentionDue(c)):"รอส่งมอบงาน")+'</b></div>'+
+        '<div><span>ประกันงานโครงสร้าง 5 ปี</span><b class="num">'+(warrantyEnd(c,5)?thDateFull(warrantyEnd(c,5)):"รอส่งมอบงาน")+'</b></div>'+
+        '<div><span>ประกันงานสถาปัตย์/ระบบ 1 ปี</span><b class="num">'+(warrantyEnd(c,1)?thDateFull(warrantyEnd(c,1)):"รอส่งมอบงาน")+'</b></div>'+
+      '</div>'+
+      ((c.employer||c.employerRep)?'<div class="muted" style="font-size:12.5px;margin-top:8px">ผู้ว่าจ้าง: '+esc(c.employer||"—")+
+        (c.employerRep?' · ตัวแทน: '+esc(c.employerRep):'')+'</div>':'')+
       '<div style="font-size:13.5px;color:var(--ink-3);margin-top:8px;line-height:1.5">'+esc(c.bank||"")+'</div>'+
       '<div class="ctr-docs">'+docChip("contract",c)+
       '<button class="clip" data-files="contract:'+c.id+'">เอกสารสัญญา'+
@@ -837,12 +906,14 @@ function editPayment(id){
     fld("detail","รายละเอียดงาน",p.detail,"textarea")+
     '<div class="f-3">'+fld("amount","มูลค่างวด (บาท)",p.amount,"number")+fld("vat","VAT (บาท)",p.vat,"number")+
     fld("retention","หักประกัน (บาท)",p.retention,"number")+'</div>'+
-    '<div class="f-2">'+fld("reqDate","วันที่เบิก",p.reqDate,"date")+fld("paidDate","วันที่โอน (เว้นว่าง = ยังไม่จ่าย)",p.paidDate,"date")+'</div>'+
+    '<div class="f-3">'+fld("reqDate","วันที่เบิก",p.reqDate,"date")+
+    fld("certDate","วันที่ CM รับรองผลตรวจ",p.certDate,"date")+
+    fld("paidDate","วันที่โอน (เว้นว่าง = ยังไม่จ่าย)",p.paidDate,"date")+'</div>'+
     fld("note","หมายเหตุ",p.note),
     async o=>{
       await save(COLS.payments, id||uid("p"), {contractId:o.contractId,seq:Number(o.seq||0),detail:o.detail,
         amount:Number(o.amount||0),vat:Number(o.vat||0),retention:Number(o.retention||0),
-        invoice:o.invoice,reqDate:o.reqDate,paidDate:o.paidDate,note:o.note});
+        invoice:o.invoice,reqDate:o.reqDate,certDate:o.certDate,paidDate:o.paidDate,note:o.note});
     });
 }
 function editExtra(id){
@@ -862,6 +933,7 @@ function editEot(id){
   openModal(id?"แก้ไขคำขอขยายเวลา":"บันทึกคำขอขยายเวลา",
     '<div class="f-3">'+fld("no","ครั้งที่",e.no,"number")+fld("docNo","เลขที่เอกสาร",e.docNo)+
     fld("submitDate","วันที่ยื่น",e.submitDate,"date")+'</div>'+
+    fld("eventDate","วันที่เกิดเหตุ (สัญญาข้อ 10.2 ให้แจ้งภายใน 15 วัน)",e.eventDate,"date")+
     sel("contractId","สัญญาที่เกี่ยวข้อง",e.contractId,S.contracts.map(c=>[c.id,c.code+" — "+c.name]))+
     fld("reason","เหตุผล / สาเหตุความล่าช้า",e.reason,"textarea")+
     '<div class="f-3">'+fld("days","จำนวนวันที่ขอ",e.days,"number")+fld("oldEnd","สิ้นสุดเดิม",e.oldEnd,"date")+
@@ -870,7 +942,7 @@ function editEot(id){
     fld("decisionDate","วันที่อนุมัติ / ตอบกลับ",e.decisionDate,"date")+'</div>'+
     fld("note","หมายเหตุ",e.note),
     async o=>{ await save(COLS.eots, id||uid("e"), {no:Number(o.no||0),docNo:o.docNo,contractId:o.contractId,
-      submitDate:o.submitDate,reason:o.reason,days:Number(o.days||0),oldEnd:o.oldEnd,newEnd:o.newEnd,
+      submitDate:o.submitDate,eventDate:o.eventDate,reason:o.reason,days:Number(o.days||0),oldEnd:o.oldEnd,newEnd:o.newEnd,
       status:o.status,decisionDate:o.decisionDate,note:o.note}); });
 }
 function editRfa(id){
@@ -900,15 +972,25 @@ function editContract(id){
   openModal(id?"แก้ไขสัญญา":"เพิ่มสัญญา",
     '<div class="f-2">'+fld("code","ชื่อย่อสัญญา",c.code)+fld("name","ชื่อสัญญา / อาคาร",c.name)+'</div>'+
     fld("contractor","ผู้รับจ้าง",c.contractor)+
-    '<div class="f-3">'+fld("amount","มูลค่าสัญญา (บาท)",c.amount,"number")+fld("periods","จำนวนงวด",c.periods,"number")+
-    fld("endDate","กำหนดแล้วเสร็จ",c.endDate,"date")+'</div>'+
+    '<div class="f-3">'+fld("amount","เนื้องานตามสัญญา ก่อน VAT (บาท)",c.amount,"number")+fld("periods","จำนวนงวด",c.periods,"number")+
+    fld("startDate","วันเริ่มงาน",c.startDate,"date")+'</div>'+
+    '<div class="f-3">'+fld("endDate","กำหนดแล้วเสร็จ",c.endDate,"date")+fld("durationDays","ระยะเวลาก่อสร้าง (วัน)",c.durationDays,"number")+
+    fld("penaltyDay","ค่าปรับล่าช้า (บาท/วัน)",c.penaltyDay,"number")+'</div>'+
+    '<div class="f-3">'+fld("inspectDays","ตรวจงานภายใน (วันทำการ)",c.inspectDays,"number")+
+    fld("payDays","จ่ายภายใน (วันทำการ) หลังรับรองผลตรวจ",c.payDays,"number")+
+    fld("handoverDate","วันส่งมอบงาน (ใช้คำนวณคืนประกัน)",c.handoverDate,"date")+'</div>'+
+    '<div class="f-2">'+fld("employer","ผู้ว่าจ้าง",c.employer)+fld("employerRep","ตัวแทนผู้ว่าจ้าง",c.employerRep)+'</div>'+
     '<div class="f-3">'+fld("vat","VAT (%)",c.vat,"number")+fld("retention","หักประกัน (%)",c.retention,"number")+
     fld("dueDay","ครบกำหนดจ่ายทุกวันที่ (เว้นว่าง = ไม่กำหนด)",c.dueDay,"number")+'</div>'+
     '<div class="f-2">'+fld("order","ลำดับแสดงผล",c.order,"number")+'</div>'+
     fld("bank","บัญชีรับเงิน",c.bank,"textarea"),
     async o=>{ await save(COLS.contracts, id||uid("c"), {code:o.code,name:o.name,contractor:o.contractor,
       amount:Number(o.amount||0),periods:Number(o.periods||0),endDate:o.endDate,vat:Number(o.vat||0),
-      retention:Number(o.retention||0),dueDay:o.dueDay?Number(o.dueDay):null,order:Number(o.order||0),bank:o.bank}); });
+      retention:Number(o.retention||0),dueDay:o.dueDay?Number(o.dueDay):null,order:Number(o.order||0),bank:o.bank,
+      startDate:o.startDate,durationDays:o.durationDays?Number(o.durationDays):null,
+      inspectDays:o.inspectDays?Number(o.inspectDays):null,payDays:o.payDays?Number(o.payDays):null,
+      penaltyDay:o.penaltyDay?Number(o.penaltyDay):null,handoverDate:o.handoverDate,
+      employer:o.employer,employerRep:o.employerRep}); });
 }
 
 /* ---------- attachment drawer ---------- */

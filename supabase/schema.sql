@@ -19,6 +19,14 @@ create table if not exists nm74.contracts (
   retention   numeric(5,2)  default 0,
   end_date    date,
   due_day     int,                            -- วันครบกำหนดจ่ายประจำเดือน (เช่น 19)
+  start_date  date,                           -- วันเริ่มงานตามสัญญา
+  duration_days int,                          -- ระยะเวลาก่อสร้าง (วัน)
+  inspect_days  int,                          -- CM ต้องตรวจงานเสร็จภายใน (วันทำการ)
+  pay_days      int,                          -- จ่ายภายใน (วันทำการ) หลังรับรองผลตรวจ
+  penalty_day   numeric(12,2),                -- ค่าปรับล่าช้าต่อวัน
+  handover_date date,                         -- วันส่งมอบงาน (ใช้คำนวณคืนประกัน/ประกันผลงาน)
+  employer      text,                         -- ผู้ว่าจ้าง
+  employer_rep  text,                         -- ตัวแทนผู้ว่าจ้าง
   bank        text,
   created_at  timestamptz default now(),
   updated_at  timestamptz default now()
@@ -34,6 +42,7 @@ create table if not exists nm74.payments (
   retention   numeric(14,2) default 0,
   invoice     text,
   req_date    date,
+  cert_date   date,                           -- วันที่ CM รับรองผลตรวจ
   paid_date   date,
   note        text,
   created_at  timestamptz default now(),
@@ -61,6 +70,7 @@ create table if not exists nm74.eot (            -- คำขอขยายร�
   doc_no        text,
   contract_id   text references nm74.contracts(id) on delete set null,
   submit_date   date,
+  event_date    date,                          -- วันที่เกิดเหตุ (กรอบแจ้ง 15 วัน ตามข้อ 10.2)
   reason        text,
   days          int default 0,
   old_end       date,

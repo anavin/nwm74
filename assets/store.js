@@ -11,13 +11,18 @@ const BUCKET = "nm74-files";
 /* ---- แปลงชื่อฟิลด์ ระหว่าง JS (camelCase) กับ Postgres (snake_case) ---- */
 const MAPS = {
   contracts: {order:"ord", code:"code", name:"name", contractor:"contractor", amount:"amount",
-    periods:"periods", vat:"vat", retention:"retention", endDate:"end_date", dueDay:"due_day", bank:"bank"},
+    periods:"periods", vat:"vat", retention:"retention", endDate:"end_date", dueDay:"due_day",
+    startDate:"start_date", durationDays:"duration_days", inspectDays:"inspect_days", payDays:"pay_days",
+    penaltyDay:"penalty_day", handoverDate:"handover_date", employer:"employer", employerRep:"employer_rep",
+    bank:"bank"},
   payments: {contractId:"contract_id", seq:"seq", detail:"detail", amount:"amount", vat:"vat",
-    retention:"retention", invoice:"invoice", reqDate:"req_date", paidDate:"paid_date", note:"note"},
+    retention:"retention", invoice:"invoice", reqDate:"req_date", certDate:"cert_date",
+    paidDate:"paid_date", note:"note"},
   extras: {building:"building", detail:"detail", amount:"amount", discount:"discount",
     invoice:"invoice", reqDate:"req_date", paidDate:"paid_date", note:"note"},
   eot: {no:"no", docNo:"doc_no", contractId:"contract_id", submitDate:"submit_date", reason:"reason",
-    days:"days", oldEnd:"old_end", newEnd:"new_end", status:"status", decisionDate:"decision_date", note:"note"},
+    days:"days", oldEnd:"old_end", newEnd:"new_end", status:"status", decisionDate:"decision_date",
+    eventDate:"event_date", note:"note"},
   rfa: {order:"ord", title:"title", trade:"trade", category:"category", detail:"detail", docNo:"doc_no",
     brand:"brand", reviewer:"reviewer", leadDays:"lead_days", requiredOn:"required_on", dueDate:"due_date",
     submitDate:"submit_date", status:"status", decisionDate:"decision_date", note:"note"},
@@ -25,7 +30,7 @@ const MAPS = {
     docType:"doc_type", storagePath:"storage_path", url:"url", createdAt:"created_at"}
 };
 const DATE_FIELDS = new Set(["end_date","req_date","paid_date","submit_date","old_end","new_end",
-  "decision_date","required_on","due_date"]);
+  "decision_date","required_on","due_date","start_date","handover_date","cert_date","event_date"]);
 
 function toRow(table, obj){
   const map = MAPS[table], row = {};
@@ -33,7 +38,8 @@ function toRow(table, obj){
     let v = obj[k];
     if(v === undefined) continue;
     if(DATE_FIELDS.has(map[k]) && (v === "" || v === null)) v = null;
-    if(v === "" && ["amount","vat","retention","discount","days","seq","ord","periods","lead_days","no"].includes(map[k])) v = null;
+    if(v === "" && ["amount","vat","retention","discount","days","seq","ord","periods","lead_days","no",
+      "duration_days","inspect_days","pay_days","penalty_day","due_day"].includes(map[k])) v = null;
     row[map[k]] = v;
   }
   return row;
