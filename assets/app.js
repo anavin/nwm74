@@ -363,11 +363,23 @@ function viewDash(){
   });
   S.extras.filter(x=>!isPaid(x)).forEach(x=>dueRows.push({rt:"extra",rec:x,who:x.building,what:"งานเพิ่ม",
       invoice:x.invoice,amount:paidNet(x),date:x.reqDate,due:"",age:daysBetween(x.reqDate),late:pstatus(x)==="late"}));
-  dueRows.sort((a,b)=>(b.late?1:0)-(a.late?1:0) || (b.age||0)-(a.age||0));
+  const urgent=(a,b)=>(b.late?1:0)-(a.late?1:0) || (b.age||0)-(a.age||0);
+  dueRows.sort(urgent);
   const dueTotal=dueRows.reduce((s,r)=>s+r.amount,0);
   const overdue=dueRows.filter(r=>r.late);
   const overdueSum=overdue.reduce((s,r)=>s+r.amount,0);
   const maxAge=Math.max(30,...dueRows.map(r=>Math.abs(r.age||0)));
+
+  /* จัดกลุ่มตามสัญญา แล้วต่อท้ายด้วยงานเพิ่ม — ในกลุ่มเรียงตามความเร่งด่วน */
+  const dueGroups=[];
+  S.contracts.forEach(c=>{
+    const rows=dueRows.filter(r=>r.rt==="payment"&&r.rec.contractId===c.id).sort(urgent);
+    if(rows.length) dueGroups.push({name:esc(c.code)+" — "+esc(c.name),who:esc(c.contractor||""),
+      view:"pay",gc:c.id,rows});
+  });
+  const exDue=dueRows.filter(r=>r.rt==="extra").sort(urgent);
+  if(exDue.length) dueGroups.push({name:"งานเพิ่ม (นอกสัญญา)",who:"งานที่เกิดขึ้นนอกเหนือสัญญา",
+    view:"extra",gc:"",rows:exDue});
 
   const kpi=(cls,lab,val,unit,note,go)=>'<div class="kpi '+cls+(go?" go":"")+'"'+(go||"")+
     (go?' role="button" tabindex="0"':'')+'><div class="lab">'+lab+'</div><div class="val">'+val+
@@ -401,16 +413,28 @@ function viewDash(){
 
   /* ============ ตารางค้างจ่ายรายรายการ ============ */
   '<div class="card" style="margin-bottom:16px"><div class="card-h"><h3>รายการค้างจ่าย</h3>'+
-  '<span class="hint">คลิกชื่อรายการเพื่อไปที่งวดนั้น · <button class="btn ghost sm" data-go="pay">ดูงวดงานทั้งหมด</button></span>'+
+  '<span class="hint">แยกตามสัญญา · ในกลุ่มเรียงตามความเร่งด่วน · คลิกชื่อรายการเพื่อไปที่งวดนั้น<br>'+
+  '<button class="btn ghost sm" data-go="pay">ดูงวดงานทั้งหมด</button></span>'+
   '</div><div class="tablewrap">'+
   (dueRows.length?'<table><thead><tr><th>รายการ</th><th>เลขที่ใบเบิก</th><th>ยื่นเมื่อ</th>'+
     '<th>ครบกำหนดจ่าย</th><th>สถานะเวลา</th><th class="r">ยอดที่ต้องโอน</th><th class="c">เอกสาร</th><th></th></tr></thead><tbody>'+
-    dueRows.map(r=>{
+    dueGroups.map(g=>{
+      const gsum=g.rows.reduce((s,r)=>s+r.amount,0), glate=g.rows.filter(r=>r.late).length;
+      return '<tr class="ghead"><td colspan="8"><div class="gh">'+
+        '<div class="gh-nm"><button class="golink strong" data-go="'+g.view+'"'+
+          (g.gc?' data-gc="'+g.gc+'"':'')+'>'+g.name+'</button>'+
+          '<div class="gh-who">'+g.who+'</div></div>'+
+        '<div class="gh-meta">'+g.rows.length+' รายการค้าง'+
+          (glate?' · <b class="ghlate">เลยกำหนด '+glate+'</b>':'')+'</div>'+
+        '<div class="gh-sum num">'+money(gsum)+'</div></div></td></tr>'+
+      g.rows.map(r=>{
       const late=r.late;
       const gv = r.rt==="payment" ? "pay" : "extra";
       const gc = r.rt==="payment" ? ' data-gc="'+(r.rec.contractId||"")+'"' : "";
       return '<tr><td data-l="รายการ" class="stripe '+(late?"late":"due")+'" style="min-width:200px">'+
-        '<button class="golink strong" data-go="'+gv+'#'+r.rt+':'+r.rec.id+'"'+gc+'>'+esc(r.who)+' · '+esc(r.what)+'</button>'+
+        /* ชื่อสัญญาอยู่ที่หัวกลุ่มแล้ว ในแถวจึงเหลือเฉพาะงวด/อาคาร */
+        '<button class="golink strong" data-go="'+gv+'#'+r.rt+':'+r.rec.id+'"'+gc+'>'+
+          esc(r.rt==="payment" ? r.what : r.who)+'</button>'+
         '<div class="muted" style="font-size:13px">'+esc((r.rec.detail||"").slice(0,70))+'</div></td>'+
         '<td data-l="เลขที่ใบเบิก" class="num">'+esc(r.invoice||"—")+'</td>'+
         '<td data-l="ยื่นเมื่อ" class="num">'+thDate(r.date)+'</td>'+
@@ -424,6 +448,7 @@ function viewDash(){
         '<td data-l="ยอดที่ต้องโอน" class="r num" style="font-weight:600;font-size:16px">'+money(r.amount)+'</td>'+
         '<td data-l="เอกสาร" class="c"><div>'+docChip(r.rt,r.rec)+'</div></td>'+
         '<td><div class="rowacts"><button class="btn ghost sm" data-edit="'+(r.rt==="payment"?"pay":"extra")+':'+r.rec.id+'">บันทึกการโอน</button></div></td></tr>';
+      }).join("");
     }).join("")+
     '</tbody><tfoot><tr><td colspan="5" class="r" style="font-weight:600">รวมค้างจ่าย</td>'+
     '<td class="r num" style="font-weight:700;font-size:17px">'+money(dueTotal)+'</td><td colspan="2"></td></tr></tfoot></table>'
@@ -447,7 +472,10 @@ function viewDash(){
       const lateDl = dl && dl<today && st!=="paid";
       return '<tr><td data-l="หมวดงาน" class="stripe '+(st==="idle"?"":st)+'" style="min-width:220px">'+
         '<button class="golink strong" data-go="rfa#rfa:'+r.id+'">'+esc(r.title||"—")+'</button>'+
-        '<div class="muted" style="font-size:12.5px">'+esc(r.trade||"")+' · '+esc(r.reviewer||"")+'</div></td>'+
+        (r.detail?'<div class="muted" style="font-size:13px;line-height:1.45;margin-top:2px">'+esc(r.detail)+'</div>':'')+
+        '<div class="muted" style="font-size:12.5px;margin-top:3px">'+esc(r.trade||"")+
+          (r.category?' · '+esc(r.category):'')+' · ผู้พิจารณา '+esc(r.reviewer||"—")+'</div>'+
+        (r.note?'<div class="muted" style="font-size:12.5px;margin-top:2px">หมายเหตุ: '+esc(r.note)+'</div>':'')+'</td>'+
         '<td data-l="เลขที่เอกสาร" class="num">'+esc(r.docNo||"—")+'</td>'+
         '<td data-l="ยี่ห้อ / รุ่น">'+(r.brand?esc(r.brand):'<span class="muted">—</span>')+'</td>'+
         '<td data-l="Lead time" class="c num">'+(r.leadDays?r.leadDays+" วัน":'<span class="muted">—</span>')+'</td>'+
