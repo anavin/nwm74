@@ -475,10 +475,11 @@ function viewDash(){
 
   /* ============ งานขออนุมัติ ============ */
   '<div class="card" style="margin-top:16px"><div class="card-h"><h3>งานขออนุมัติ (RFA)</h3>'+
-  '<span class="hint">เรียงตามความเร่งด่วน · <button class="btn ghost sm" data-view="rfa">ดูทั้งหมด</button></span></div>'+
+  '<span class="hint">เฉพาะรายการที่ยื่นแล้ว · <button class="btn ghost sm" data-view="rfa">ดูทั้งหมด</button></span></div>'+
   '<div class="tablewrap"><table><thead><tr><th>หมวดงาน / เรื่อง</th><th>เลขที่เอกสาร</th><th>ยี่ห้อ / รุ่น</th>'+
   '<th class="c">Lead time</th><th>ต้องอนุมัติภายใน</th><th>ยื่นเมื่อ</th><th class="c">สถานะ</th><th class="c">เอกสาร</th></tr></thead><tbody>'+
-  (S.rfas.length? [...S.rfas].sort((a,b)=>{
+  (function(){ const shown=S.rfas.filter(r=>rfaState(r)!=="idle");
+    return shown.length? [...shown].sort((a,b)=>{
       const rank={late:0,due:1,idle:2,paid:3};
       const ra=rank[rfaState(a)], rb=rank[rfaState(b)];
       if(ra!==rb) return ra-rb;
@@ -499,8 +500,9 @@ function viewDash(){
         '<td data-l="สถานะ" class="c"><span class="pill '+(st==="idle"?"info":st)+'">'+esc(r.status||"—")+'</span></td>'+
         '<td data-l="เอกสาร" class="c"><div>'+docChip("rfa",r)+'</div></td></tr>';
     }).join("")+
-    (S.rfas.length>8?'<tr><td colspan="8" class="muted" style="text-align:center">และอีก '+(S.rfas.length-8)+' รายการ — กด “ดูทั้งหมด” ที่หัวตาราง</td></tr>':'')
-   :'<tr><td colspan="8"><div class="empty">ยังไม่มีรายการขออนุมัติ</div></td></tr>')+
+    (shown.length>8?'<tr><td colspan="8" class="muted" style="text-align:center">และอีก '+(shown.length-8)+' รายการ — กด “ดูทั้งหมด” ที่หัวตาราง</td></tr>':'')
+   :'<tr><td colspan="8"><div class="empty">ยังไม่มีรายการที่ยื่นขออนุมัติ — '+
+     S.rfas.filter(r=>rfaState(r)==="idle").length+' หมวดงานรอเตรียมเอกสาร ดูได้ที่เมนูงานขออนุมัติ</div></td></tr>'; })()+
   '</tbody></table></div></div>'+
 
   '<div class="card" style="margin-top:16px"><div class="card-h"><h3>ไทม์ไลน์สัญญาและการขยายเวลา</h3>'+
