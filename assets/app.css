@@ -515,3 +515,39 @@ tbody tr:first-child.ghead>td{border-top:0}
 .rfatally b{font-family:"IBM Plex Mono",monospace;font-weight:600;color:var(--ink)}
 .rfatally b.ghlate{color:var(--late)}
 @media(max-width:880px){.rfatally{font-size:13.5px;line-height:1.7}}
+
+/* ---------- การ์ดรายการค้างจ่ายบนมือถือ: ไม่ซ้ำชื่อคอลัมน์ทุกบรรทัด ---------- */
+@media(max-width:880px){
+  .duetbl tbody tr:not(.ghead){display:grid;grid-template-columns:1fr auto;
+    gap:3px 14px;align-items:baseline;padding:14px 15px}
+  .duetbl tbody tr:not(.ghead)>td{display:block;padding:0;border:0;margin:0;
+    text-align:left !important;white-space:normal}
+  .duetbl td:before{content:none !important}
+
+  .duetbl tbody tr:not(.ghead)>td[data-l="รายการ"]{grid-column:1/-1;padding:0 0 8px;
+    margin-bottom:7px;border-bottom:1px dashed var(--line)}
+  .duetbl td[data-l="เลขที่ใบเบิก"]{grid-column:1;font-size:14px;font-weight:600}
+  .duetbl td[data-l="ยอดที่ต้องโอน"]{grid-column:2;grid-row:2/5;align-self:center;
+    text-align:right !important;font-size:21px;font-weight:700}
+  .duetbl td[data-l="ยื่นเมื่อ"],.duetbl td[data-l="ครบกำหนดจ่าย"]{
+    grid-column:1;font-size:13.5px;color:var(--ink-3)}
+  /* คำนำหน้าสั้นๆ ให้อ่านเป็นประโยค ไม่ใช่ป้ายหัวคอลัมน์ */
+  .duetbl td[data-l="ยื่นเมื่อ"]:before{content:"ยื่นเบิก " !important}
+  .duetbl td[data-l="ครบกำหนดจ่าย"]:before{content:"ครบกำหนดจ่าย " !important}
+  .duetbl td[data-l="ยื่นเมื่อ"]:before,.duetbl td[data-l="ครบกำหนดจ่าย"]:before{
+    display:inline !important;font-size:inherit;font-weight:400;letter-spacing:0;
+    text-transform:none;color:var(--ink-3);padding:0;margin:0}
+  .duetbl td[data-l="สถานะเวลา"]{grid-column:1/-1;margin-top:8px}
+  .duetbl td[data-l="เอกสาร"]{grid-column:1;margin-top:9px}
+  .duetbl tbody tr:not(.ghead)>td:last-child{grid-column:2;margin-top:9px;
+    text-align:right !important}
+  .duetbl .rowacts{justify-content:flex-end}
+  /* แถวรวมท้ายตาราง: ป้ายซ้าย ยอดขวา ในกล่องเดียว */
+  .duetbl tfoot tr{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+    background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);
+    padding:13px 15px;margin-bottom:10px}
+  .duetbl tfoot td{background:none !important;border:0 !important;border-radius:0 !important;
+    padding:0 !important;margin:0 !important;display:block;text-align:left !important}
+  .duetbl tfoot td:empty{display:none}
+  .duetbl tfoot td:nth-child(2){text-align:right !important;font-size:19px;font-weight:700}
+}

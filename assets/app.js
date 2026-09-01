@@ -416,7 +416,7 @@ function viewDash(){
   '<span class="hint">แยกตามสัญญา · ในกลุ่มเรียงตามความเร่งด่วน · คลิกชื่อรายการเพื่อไปที่งวดนั้น<br>'+
   '<button class="btn ghost sm" data-go="pay">ดูงวดงานทั้งหมด</button></span>'+
   '</div><div class="tablewrap">'+
-  (dueRows.length?'<table><thead><tr><th>รายการ</th><th>เลขที่ใบเบิก</th><th>ยื่นเมื่อ</th>'+
+  (dueRows.length?'<table class="duetbl"><thead><tr><th>รายการ</th><th>เลขที่ใบเบิก</th><th>ยื่นเมื่อ</th>'+
     '<th>ครบกำหนดจ่าย</th><th>สถานะเวลา</th><th class="r">ยอดที่ต้องโอน</th><th class="c">เอกสาร</th><th></th></tr></thead><tbody>'+
     dueGroups.map(g=>{
       const gsum=g.rows.reduce((s,r)=>s+r.amount,0), glate=g.rows.filter(r=>r.late).length;
