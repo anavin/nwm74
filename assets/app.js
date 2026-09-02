@@ -543,7 +543,9 @@ function viewDash(){
   '</span> · <button class="btn ghost sm" data-go="rfa">ดูทั้งหมด</button></span></div>'+
   '<div class="tablewrap"><table><thead><tr><th>หมวดงาน / เรื่อง</th><th>เลขที่เอกสาร</th><th>ยี่ห้อ / รุ่น</th>'+
   '<th class="c">Lead time</th><th>ต้องอนุมัติภายใน</th><th>ยื่นเมื่อ</th><th class="c">สถานะ</th><th class="c">เอกสาร</th></tr></thead><tbody>'+
-  (function(){ const shown=S.rfas.filter(r=>rfaState(r)!=="idle");
+  /* หน้าภาพรวมโชว์เฉพาะงานที่ยังต้องตาม — ยื่นแล้วแต่ยังไม่ได้ผล
+     อนุมัติแล้ว/อนุมัติตามหมายเหตุ = จบแล้ว ไปดูได้ที่เมนูงานขออนุมัติ */
+  (function(){ const shown=S.rfas.filter(r=>{const s=rfaState(r); return s!=="idle" && s!=="paid";});
     return shown.length? [...shown].sort((a,b)=>{
       const rank={late:0,due:1,idle:2,paid:3};
       const ra=rank[rfaState(a)], rb=rank[rfaState(b)];
@@ -569,8 +571,13 @@ function viewDash(){
         '<td data-l="เอกสาร" class="c"><div>'+docChip("rfa",r)+'</div></td></tr>';
     }).join("")+
     (shown.length>8?'<tr><td colspan="8" class="muted" style="text-align:center">และอีก '+(shown.length-8)+' รายการ — กด “ดูทั้งหมด” ที่หัวตาราง</td></tr>':'')
-   :'<tr><td colspan="8"><div class="empty">ยังไม่มีรายการที่ยื่นขออนุมัติ — '+
-     S.rfas.filter(r=>rfaState(r)==="idle").length+' หมวดงานรอเตรียมเอกสาร ดูได้ที่เมนูงานขออนุมัติ</div></td></tr>'; })()+
+   :(function(){ const idle=S.rfas.filter(r=>rfaState(r)==="idle").length,
+                      ok=S.rfas.filter(r=>rfaState(r)==="paid").length;
+      return '<tr><td colspan="8"><div class="empty">'+
+        (ok&&!idle ? 'อนุมัติครบทุกรายการแล้ว ('+ok+' รายการ) — ไม่มีงานที่ต้องติดตาม'
+         : ok ? 'ไม่มีรายการที่รอผลอนุมัติ — อนุมัติแล้ว '+ok+' รายการ · อีก '+idle+' หมวดงานรอเตรียมเอกสาร'
+         : 'ยังไม่มีรายการที่ยื่นขออนุมัติ — '+idle+' หมวดงานรอเตรียมเอกสาร ดูได้ที่เมนูงานขออนุมัติ')+
+        '</div></td></tr>'; })(); })()+
   '</tbody></table></div></div>'+
 
   /* ============ ตัวเลขรอง ============ */
