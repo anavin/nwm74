@@ -146,8 +146,21 @@ export default async function handler(req, res) {
       key:   { set: !!SERVICE, ok: kk.ok, kind: kk.kind, length: SERVICE.length },
       token: { sent: !!token, host: tokenHost || "(อ่านไม่ได้)" },
       match: !!(envHost && tokenHost) ? envHost === tokenHost : null,
-      auth: null, members: null
+      keyAlone: null, auth: null, members: null
     };
+    /* ทดสอบคีย์ "เดี่ยวๆ" ก่อน โดยไม่มีโทเคนผู้ใช้มาเกี่ยว
+       ผ่าน  = คีย์ใช้ได้ ปัญหาอยู่ที่โทเคนผู้ใช้
+       ไม่ผ่าน = คีย์นั่นแหละที่มีปัญหา */
+    if (URL_BASE && SERVICE) {
+      try {
+        const r = await fetch(URL_BASE + "/auth/v1/admin/users?per_page=1",
+          { headers: { apikey: SERVICE, Authorization: "Bearer " + SERVICE } });
+        out.keyAlone = { status: r.status, ok: r.ok };
+        if (!r.ok) out.keyAlone.detail = (await r.text().catch(() => "")).slice(0, 200);
+      } catch (e) {
+        out.keyAlone = { status: 0, ok: false, detail: String(e.message || e).slice(0, 200) };
+      }
+    }
     if (URL_BASE && SERVICE && token) {
       try {
         const r = await fetch(URL_BASE + "/auth/v1/user", { headers: { apikey: SERVICE, Authorization: "Bearer " + token } });
@@ -160,11 +173,18 @@ export default async function handler(req, res) {
           } catch (e) {
             out.members = { found: false, error: String(e.message || e).slice(0, 160) };
           }
+        } else {
+          /* ข้อความจาก Supabase ตรงๆ — ไม่มีคีย์ปนอยู่ในนี้ */
+          out.auth.detail = (await r.text().catch(() => "")).slice(0, 200);
         }
       } catch (e) {
-        out.auth = { status: 0, ok: false, error: String(e.message || e).slice(0, 160) };
+        out.auth = { status: 0, ok: false, detail: String(e.message || e).slice(0, 200) };
       }
     }
+    /* โทเคนหมดอายุหรือยัง — อ่านจาก exp ในโทเคนเอง ไม่ต้องถาม Supabase */
+    const tb = jwtBody(token) || {};
+    if (tb.exp) out.token.expired = (tb.exp * 1000) < Date.now();
+    if (tb.role) out.token.role = tb.role;
     return res.status(200).json(out);
   }
 

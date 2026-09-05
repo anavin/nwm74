@@ -1193,11 +1193,18 @@ function diagHtml(d){
     items.push(row(d.match, "URL ตรงกับโปรเจกต์ที่หน้าเว็บล็อกอินอยู่",
       d.match ? "ทั้งสองฝั่งคือ "+d.url.host
               : "Vercel ชี้ "+d.url.host+" แต่หน้าเว็บล็อกอินที่ "+d.token.host));
-  items.push(row(d.token.sent, "หน้าเว็บส่งโทเคนผู้ใช้ไปด้วย",
-    d.token.sent ? "" : "ยังไม่ได้ล็อกอิน หรือเซสชันหลุด"));
+  if(d.keyAlone)
+    items.push(row(!!d.keyAlone.ok, "คีย์เรียก Supabase Admin API ได้ (ทดสอบคีย์เดี่ยวๆ)",
+      d.keyAlone.ok ? "คีย์ใช้งานได้จริง"
+        : "ตอบกลับ "+(d.keyAlone.status||"เชื่อมต่อไม่ได้")+(d.keyAlone.detail?" · "+d.keyAlone.detail:"")));
+  items.push(row(d.token.sent ? (d.token.expired===true ? false : true) : false,
+    "โทเคนผู้ใช้ที่หน้าเว็บส่งมา",
+    !d.token.sent ? "ยังไม่ได้ล็อกอิน หรือเซสชันหลุด"
+      : d.token.expired===true ? "หมดอายุแล้ว"
+      : "ยังไม่หมดอายุ"+(d.token.role?" · role "+d.token.role:"")));
   if(d.auth)
-    items.push(row(!!d.auth.ok, "Supabase ยอมรับคีย์และโทเคน",
-      d.auth.ok ? "" : "ตอบกลับ "+(d.auth.status||"เชื่อมต่อไม่ได้")+(d.auth.error?" · "+d.auth.error:"")));
+    items.push(row(!!d.auth.ok, "Supabase ยอมรับคีย์+โทเคนคู่กัน",
+      d.auth.ok ? "" : "ตอบกลับ "+(d.auth.status||"เชื่อมต่อไม่ได้")+(d.auth.detail?" · "+d.auth.detail:"")));
   if(d.members)
     items.push(row(!!d.members.found, "บัญชีคุณอยู่ในตาราง nm74.members",
       d.members.found ? "สิทธิ์: "+(d.members.role==="admin"?"แอดมิน":d.members.role)
@@ -1214,8 +1221,15 @@ function diagHtml(d){
     next = "SUPABASE_URL ใน Vercel ชี้คนละโปรเจกต์กับ config.js แก้ให้เป็น https://"+d.token.host+" แล้ว deploy ใหม่";
   else if(!d.token.sent)
     next = "ออกจากระบบแล้วล็อกอินใหม่";
+  else if(d.keyAlone && !d.keyAlone.ok)
+    next = "คีย์ถูกชนิดแต่ Supabase ไม่รับ (ตอบ "+d.keyAlone.status+") — คีย์อาจถูก revoke ไปแล้ว "+
+           "หรือคัดลอกไม่ครบ · สร้างคีย์ใหม่ที่ Supabase → Settings → API Keys → Secret keys "+
+           "แล้ววางใหม่ใน Vercel และ deploy อีกครั้ง";
+  else if(d.token.expired===true)
+    next = "โทเคนหมดอายุจริง — ออกจากระบบแล้วล็อกอินใหม่";
   else if(d.auth && !d.auth.ok)
-    next = "คีย์ถูกชนิดแต่ Supabase ปฏิเสธ — คัดลอกคีย์ใหม่ทั้งเส้น ระวังช่องว่างติดหัวท้าย แล้ว deploy ใหม่";
+    next = "คีย์ใช้ได้และโทเคนยังไม่หมดอายุ แต่ Supabase ปฏิเสธเมื่อใช้คู่กัน (ตอบ "+d.auth.status+") — "+
+           "ส่งข้อความในบรรทัดสีแดงให้ผมดูได้เลย";
   else if(d.members && !d.members.found)
     next = d.members.error
       ? "รัน supabase/setup-all.sql ใน Supabase → SQL Editor และเช็ค Settings → API → Exposed schemas ว่ามี nm74"
