@@ -39,7 +39,7 @@ const RFA_STATUS = ["ยังไม่ยื่น","รออนุมัต�
 /* ============================ state ============================ */
 const S = {db:null, dl:null, mode:"local", view:"dash",
            contracts:[], payments:[], extras:[], eots:[], rfas:[], files:[],
-           filter:{contract:"", status:"", q:""}, seeded:false, role:"", members:[], me:"", acts:[], actUser:"", actErr:"", usersErr:""};
+           filter:{contract:"", status:"", q:""}, seeded:false, role:"", members:[], me:"", acts:[], actUser:"", actErr:"", usersErr:"", usersDiag:null};
 
 const COLS = {contracts:"contracts", payments:"payments", extras:"extras", eots:"eot", rfas:"rfa", files:"files"};
 function addDays(iso,d){ if(!iso) return ""; const x=new Date(iso+"T00:00:00"); if(isNaN(x)) return "";
@@ -1154,7 +1154,7 @@ function viewSetup(){
 
 /* ---------- ผู้ใช้งาน (เฉพาะแอดมิน) ---------- */
 async function loadMembers(){
-  try{ const r = await Store.listMembers(); S.members = r.members||[]; S.me = r.me||""; S.usersErr=""; }
+  try{ const r = await Store.listMembers(); S.members = r.members||[]; S.me = r.me||""; S.usersErr=""; S.usersDiag=null; }
   catch(e){ S.members=[]; S.usersErr = e.message||"โหลดรายชื่อไม่สำเร็จ"; }
   try{ S.acts = await Store.readActivity(300, S.actUser||""); S.actErr=""; }
   catch(e){ S.acts=[]; S.actErr = "ยังไม่ได้สร้างตารางประวัติ — รัน supabase/migration-2026-09-activity.sql"; }
@@ -1173,6 +1173,58 @@ function whenText(iso){
   if(mins<1440) return Math.round(mins/60)+" ชั่วโมงที่แล้ว · "+clock;
   return thDate(isoLocal(d))+" · "+clock;
 }
+/* ผลตรวจการตั้งค่า /api/users — แปลเป็นภาษาคนพร้อมบอกว่าต้องแก้ตรงไหน */
+function diagHtml(d){
+  const row = (ok,label,detail) =>
+    '<div class="dgrow '+(ok===true?"ok":ok===false?"bad":"unk")+'">'+
+      '<i>'+(ok===true?"✓":ok===false?"✕":"—")+'</i>'+
+      '<div><b>'+esc(label)+'</b>'+(detail?'<small>'+esc(detail)+'</small>':'')+'</div></div>';
+
+  const items = [];
+  items.push(row(!!d.url.set, "SUPABASE_URL ใน Vercel",
+    d.url.set ? "ชี้ไปที่ "+d.url.host : "ยังไม่ได้ตั้งค่า"));
+  items.push(row(d.key.set ? !!d.key.ok : false, "SUPABASE_SERVICE_ROLE_KEY ใน Vercel",
+    d.key.set ? d.key.kind+" · ยาว "+d.key.length+" ตัว" : "ยังไม่ได้ตั้งค่า"));
+  if(d.match !== null)
+    items.push(row(d.match, "URL ตรงกับโปรเจกต์ที่หน้าเว็บล็อกอินอยู่",
+      d.match ? "ทั้งสองฝั่งคือ "+d.url.host
+              : "Vercel ชี้ "+d.url.host+" แต่หน้าเว็บล็อกอินที่ "+d.token.host));
+  items.push(row(d.token.sent, "หน้าเว็บส่งโทเคนผู้ใช้ไปด้วย",
+    d.token.sent ? "" : "ยังไม่ได้ล็อกอิน หรือเซสชันหลุด"));
+  if(d.auth)
+    items.push(row(!!d.auth.ok, "Supabase ยอมรับคีย์และโทเคน",
+      d.auth.ok ? "" : "ตอบกลับ "+(d.auth.status||"เชื่อมต่อไม่ได้")+(d.auth.error?" · "+d.auth.error:"")));
+  if(d.members)
+    items.push(row(!!d.members.found, "บัญชีคุณอยู่ในตาราง nm74.members",
+      d.members.found ? "สิทธิ์: "+(d.members.role==="admin"?"แอดมิน":d.members.role)
+        : (d.members.error ? "อ่านตารางไม่ได้ · "+d.members.error
+                           : "ยังไม่มีแถวของบัญชีนี้")));
+
+  /* บอกขั้นตอนถัดไปข้อเดียว — ข้อแรกที่ยังไม่ผ่าน */
+  let next = "";
+  if(!d.url.set || !d.key.set)
+    next = "ไปที่ Vercel → Settings → Environment Variables ใส่ค่าที่ขาด ติ๊กครบทั้ง 3 environment แล้ว deploy ใหม่หนึ่งครั้ง";
+  else if(!d.key.ok)
+    next = "คีย์ผิดชนิด — เอาจาก Supabase → Settings → API Keys หัวข้อ Secret keys (ขึ้นต้น sb_secret_) ไม่ใช่ Publishable key แล้ว deploy ใหม่";
+  else if(d.match === false)
+    next = "SUPABASE_URL ใน Vercel ชี้คนละโปรเจกต์กับ config.js แก้ให้เป็น https://"+d.token.host+" แล้ว deploy ใหม่";
+  else if(!d.token.sent)
+    next = "ออกจากระบบแล้วล็อกอินใหม่";
+  else if(d.auth && !d.auth.ok)
+    next = "คีย์ถูกชนิดแต่ Supabase ปฏิเสธ — คัดลอกคีย์ใหม่ทั้งเส้น ระวังช่องว่างติดหัวท้าย แล้ว deploy ใหม่";
+  else if(d.members && !d.members.found)
+    next = d.members.error
+      ? "รัน supabase/setup-all.sql ใน Supabase → SQL Editor และเช็ค Settings → API → Exposed schemas ว่ามี nm74"
+      : "รัน setup-all.sql ส่วนที่ 2 เพื่อตั้งบัญชีคุณเป็นแอดมินคนแรก (แก้อีเมลในไฟล์ให้ตรงกับบัญชีที่ใช้ก่อนรัน)";
+  else if(d.members && d.members.found && d.members.role !== "admin")
+    next = "บัญชีนี้เป็น "+d.members.role+" ให้แอดมินคนอื่นเปลี่ยนสิทธิ์ให้ หรือแก้ role ในตาราง members";
+  else
+    next = "ทุกอย่างผ่านแล้ว — กดรีเฟรชหน้าอีกครั้ง";
+
+  return '<div class="diag">'+items.join("")+
+    '<div class="dgnext"><b>ต้องทำต่อ</b> '+esc(next)+'</div></div>';
+}
+
 function viewUsers(){
   tools('<button class="btn primary" data-act="new-user">+ เพิ่มผู้ใช้</button>');
   const rows = S.members||[];
@@ -1180,13 +1232,14 @@ function viewUsers(){
 
   if(S.usersErr){
     $("#view").innerHTML =
-      '<div class="card notecard"><div class="card-h"><h3>ยังใช้งานหน้านี้ไม่ได้</h3></div>'+
+      '<div class="card notecard"><div class="card-h"><h3>ยังใช้งานหน้านี้ไม่ได้</h3>'+
+      '<span class="hint"><button class="btn ghost sm" data-act="diag-users">ตรวจการตั้งค่า</button></span></div>'+
       '<div class="card-b" style="line-height:1.75">'+
       '<p style="margin:0 0 10px">'+esc(S.usersErr)+'</p>'+
-      '<p class="muted" style="margin:0">ตรวจ 2 อย่างนี้ครับ<br>'+
-      '1. รัน <b>supabase/migration-2026-09-members.sql</b> ใน Supabase แล้วหรือยัง<br>'+
-      '2. ตั้ง <b>SUPABASE_URL</b> และ <b>SUPABASE_SERVICE_ROLE_KEY</b> ใน Vercel → Settings → Environment Variables '+
-      'แล้ว deploy ใหม่หนึ่งครั้งหรือยัง</p></div></div>';
+      (S.usersDiag ? diagHtml(S.usersDiag) :
+        '<p class="muted" style="margin:0">กด <b>ตรวจการตั้งค่า</b> ด้านบน ระบบจะบอกว่าติดตรงไหน '+
+        'โดยไม่ต้องเปิดดูคีย์เอง</p>')+
+      '</div></div>';
     return;
   }
 
@@ -1581,6 +1634,12 @@ document.addEventListener("click",async e=>{
     if(a==="new-contract") editContract(null);
     if(a==="new-user") editUser(null);
     if(a==="act-all"){ S.actUser=""; await loadMembers(); renderAll(); }
+    if(a==="diag-users"){
+      t.disabled=true; t.textContent="กำลังตรวจ…";
+      try{ S.usersDiag = await Store.diagUsers(); }
+      catch(err){ S.usersDiag=null; toast(err.message||"ตรวจไม่สำเร็จ"); }
+      renderAll();
+    }
     if(a==="export-pay") saveCSV("งวดงาน-มหาวิหารเก้าฟ้า.csv",payRows());
     if(a==="export-all") saveCSV("สรุปโครงการ-มหาวิหารเก้าฟ้า.csv",allRows());
     return;

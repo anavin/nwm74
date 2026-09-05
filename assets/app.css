@@ -539,3 +539,17 @@ tr.flash>td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .wa-lab{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--rail-ink-2);opacity:.75}
 .wa-nm{font-size:14px;font-weight:600;color:var(--rail-ink);margin-top:3px;word-break:break-word}
 .wa-id{font-size:12px;color:var(--rail-ink-2);margin-top:1px}
+
+/* ---------- ผลตรวจการตั้งค่าหน้าผู้ใช้งาน ---------- */
+.diag{display:grid;gap:8px;margin-top:4px}
+.dgrow{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--line);
+  border-radius:var(--radius);background:var(--surface-2);font-size:13.5px;line-height:1.5}
+.dgrow i{font-style:normal;font-weight:700;width:18px;flex:none;text-align:center;line-height:1.5}
+.dgrow small{display:block;color:var(--ink-3);font-size:12.5px;line-height:1.5;margin-top:2px}
+.dgrow.ok  i{color:var(--paid)}
+.dgrow.bad{background:var(--late-soft);border-color:color-mix(in srgb,var(--late) 32%,transparent)}
+.dgrow.bad i{color:var(--late)}
+.dgrow.unk i{color:var(--ink-3)}
+.dgnext{margin-top:4px;padding:11px 13px;border-radius:var(--radius);
+  background:var(--brass-soft);border:1px solid var(--brass-line);font-size:13.5px;line-height:1.6}
+.dgnext b{display:block;margin-bottom:2px}

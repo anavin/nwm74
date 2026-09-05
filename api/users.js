@@ -44,20 +44,78 @@ async function auth(path, opts = {}) {
   return body;
 }
 
+/* ---------- ตัวช่วยวินิจฉัย ----------
+   "เซสชันหมดอายุ" ที่เจอบ่อยมักไม่ใช่เซสชันหมดอายุจริง แต่เป็น 3 อย่างนี้
+     1) คีย์ใน Vercel ผิด (เอา publishable มาใส่ หรือคัดลอกไม่ครบ)
+     2) SUPABASE_URL ชี้คนละโปรเจกต์กับที่หน้าเว็บล็อกอินอยู่
+     3) ยังไม่ได้ deploy ใหม่หลังตั้งค่า ค่าเลยยังไม่มีผล
+   จึงต้องแยกให้ออกว่าเป็นอันไหน ไม่งั้นผู้ใช้จะไปล็อกอินใหม่ซ้ำๆ โดยไม่มีอะไรดีขึ้น */
+const hostOf = u => { try { return new URL(u).host; } catch { return ""; } };
+
+/* อ่านเนื้อใน JWT โดยไม่ตรวจลายเซ็น — ใช้ดูว่าโทเคนออกจากโปรเจกต์ไหนเท่านั้น */
+function jwtBody(t) {
+  try {
+    const p = String(t).split(".")[1];
+    return JSON.parse(Buffer.from(p.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8"));
+  } catch { return null; }
+}
+
+/* บอกชนิดของคีย์ได้โดยไม่เปิดเผยตัวคีย์ */
+function keyKind(k) {
+  if (!k) return { ok: false, kind: "ยังไม่ได้ตั้งค่า" };
+  if (k.startsWith("sb_secret_"))      return { ok: true,  kind: "sb_secret (ถูกต้อง)" };
+  if (k.startsWith("sb_publishable_")) return { ok: false, kind: "sb_publishable — นี่คือคีย์สาธารณะ ใช้แทนกันไม่ได้ ต้องเอาจากหัวข้อ Secret keys" };
+  if (k.startsWith("eyJ")) {
+    const b = jwtBody(k) || {};
+    return b.role === "service_role"
+      ? { ok: true,  kind: "service_role (คีย์แบบเก่า ใช้ได้)" }
+      : { ok: false, kind: "JWT แบบเก่า role = " + (b.role || "ไม่ทราบ") + " — ต้องเป็น service_role" };
+  }
+  return { ok: false, kind: "รูปแบบไม่ตรงกับคีย์ของ Supabase (อาจคัดลอกไม่ครบหรือมีช่องว่างติดมา)" };
+}
+
 /* ตรวจว่าผู้เรียกล็อกอินอยู่จริงและเป็นแอดมิน */
 async function requireAdmin(req) {
   const raw = req.headers.authorization || "";
-  const token = raw.startsWith("Bearer ") ? raw.slice(7) : "";
+  const token = raw.startsWith("Bearer ") ? raw.slice(7).trim() : "";
   if (!token) throw Object.assign(new Error("ไม่ได้ล็อกอิน"), { status: 401 });
 
   const r = await fetch(URL_BASE + "/auth/v1/user", {
     headers: { apikey: SERVICE, Authorization: "Bearer " + token }
   });
-  if (!r.ok) throw Object.assign(new Error("เซสชันหมดอายุ กรุณาล็อกอินใหม่"), { status: 401 });
+  if (!r.ok) {
+    const detail = await r.text().catch(() => "");
+    const tokenHost = hostOf((jwtBody(token) || {}).iss || "");
+    const envHost = hostOf(URL_BASE);
+    const kk = keyKind(SERVICE);
+    let msg;
+    if (tokenHost && envHost && tokenHost !== envHost)
+      msg = "SUPABASE_URL ใน Vercel ชี้คนละโปรเจกต์กับที่หน้าเว็บล็อกอินอยู่ (" + envHost + " ≠ " + tokenHost + ")";
+    else if (!kk.ok)
+      msg = "คีย์ SUPABASE_SERVICE_ROLE_KEY ใน Vercel ไม่ถูกต้อง: " + kk.kind;
+    else if (/api\s*key|invalid.*key/i.test(detail))
+      msg = "Supabase ปฏิเสธคีย์ SUPABASE_SERVICE_ROLE_KEY — ตรวจว่าคัดลอกครบและไม่มีช่องว่างติดหัวท้าย แล้ว deploy ใหม่อีกครั้ง";
+    else
+      msg = "เซสชันหมดอายุ กรุณาล็อกอินใหม่";
+    console.error("api/users auth check failed", r.status, detail.slice(0, 200));
+    throw Object.assign(new Error(msg), { status: 401, expose: true });
+  }
   const me = await r.json();
 
-  const rows = await db("/members?user_id=eq." + encodeURIComponent(me.id) + "&select=role");
-  if (!rows.length || rows[0].role !== "admin")
+  let rows;
+  try {
+    rows = await db("/members?user_id=eq." + encodeURIComponent(me.id) + "&select=role");
+  } catch (e) {
+    console.error("api/users members lookup failed", e && e.message);
+    throw Object.assign(
+      new Error("อ่านตาราง nm74.members ไม่ได้ — ยังไม่ได้รัน supabase/setup-all.sql ส่วนที่ 2 หรือยังไม่ได้เพิ่ม nm74 ใน Settings → API → Exposed schemas"),
+      { status: 500, expose: true });
+  }
+  if (!rows.length)
+    throw Object.assign(
+      new Error("บัญชีนี้ยังไม่มีในตาราง members — รัน setup-all.sql ส่วนที่ 2 เพื่อตั้งเป็นแอดมินคนแรก (แก้อีเมลในไฟล์ให้ตรงกับบัญชีคุณก่อน)"),
+      { status: 403, expose: true });
+  if (rows[0].role !== "admin")
     throw Object.assign(new Error("เฉพาะแอดมินเท่านั้นที่จัดการผู้ใช้ได้"), { status: 403 });
   return me;
 }
@@ -74,8 +132,48 @@ const cleanId = v => String(v || "").trim().toLowerCase();
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
 
+  /* ---------- ตรวจการตั้งค่า ----------
+     ตอบได้แม้ตั้งค่าไม่ครบ จะได้บอกได้ว่าขาดอะไร
+     ไม่คืนค่าคีย์ออกไป — บอกแค่ "ตั้งไว้ไหม / ชนิดถูกไหม / ยาวกี่ตัว" */
+  if (req.method === "GET" && String(req.query.diag || "") === "1") {
+    const raw = req.headers.authorization || "";
+    const token = raw.startsWith("Bearer ") ? raw.slice(7).trim() : "";
+    const kk = keyKind(SERVICE);
+    const envHost = hostOf(URL_BASE);
+    const tokenHost = hostOf((jwtBody(token) || {}).iss || "");
+    const out = {
+      url:   { set: !!URL_BASE, host: envHost || "(ไม่ได้ตั้งค่า)" },
+      key:   { set: !!SERVICE, ok: kk.ok, kind: kk.kind, length: SERVICE.length },
+      token: { sent: !!token, host: tokenHost || "(อ่านไม่ได้)" },
+      match: !!(envHost && tokenHost) ? envHost === tokenHost : null,
+      auth: null, members: null
+    };
+    if (URL_BASE && SERVICE && token) {
+      try {
+        const r = await fetch(URL_BASE + "/auth/v1/user", { headers: { apikey: SERVICE, Authorization: "Bearer " + token } });
+        out.auth = { status: r.status, ok: r.ok };
+        if (r.ok) {
+          const me = await r.json();
+          try {
+            const rows = await db("/members?user_id=eq." + encodeURIComponent(me.id) + "&select=role");
+            out.members = rows.length ? { found: true, role: rows[0].role } : { found: false };
+          } catch (e) {
+            out.members = { found: false, error: String(e.message || e).slice(0, 160) };
+          }
+        }
+      } catch (e) {
+        out.auth = { status: 0, ok: false, error: String(e.message || e).slice(0, 160) };
+      }
+    }
+    return res.status(200).json(out);
+  }
+
   if (!URL_BASE || !SERVICE) {
-    return res.status(500).json({ error: "ยังไม่ได้ตั้งค่า SUPABASE_URL หรือ SUPABASE_SERVICE_ROLE_KEY ใน Vercel" });
+    return res.status(500).json({
+      error: "ยังไม่ได้ตั้งค่าใน Vercel → Settings → Environment Variables: " +
+             [!URL_BASE && "SUPABASE_URL", !SERVICE && "SUPABASE_SERVICE_ROLE_KEY"].filter(Boolean).join(" และ ") +
+             " (ตั้งแล้วต้อง deploy ใหม่อีกครั้งค่าถึงจะมีผล)"
+    });
   }
 
   try {
@@ -180,7 +278,9 @@ export default async function handler(req, res) {
   } catch (e) {
     const st = e.status || 500;
     console.error("api/users error", st, e && e.message);      /* รายละเอียดเก็บไว้ฝั่งเซิร์ฟเวอร์ */
-    /* 4xx เป็นข้อความที่เราตั้งเอง ส่งกลับได้ · 5xx อาจมีชื่อคอลัมน์/โครงสร้างฐานข้อมูลติดมา */
-    return res.status(st).json({ error: st < 500 ? (e.message || "ทำรายการไม่สำเร็จ") : "ระบบขัดข้อง กรุณาลองใหม่" });
+    /* 4xx และข้อความที่ตั้ง expose ไว้เอง ส่งกลับได้
+       5xx อื่นๆ อาจมีชื่อคอลัมน์/โครงสร้างฐานข้อมูลติดมา จึงตอบกลางๆ */
+    const show = st < 500 || e.expose;
+    return res.status(st).json({ error: show ? (e.message || "ทำรายการไม่สำเร็จ") : "ระบบขัดข้อง กรุณาลองใหม่" });
   }
 }

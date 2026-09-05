@@ -241,6 +241,19 @@ const Store = (() => {
     if(!res.ok) throw new Error((out && out.error) || ("เรียก API ไม่สำเร็จ ("+res.status+")"));
     return out;
   }
+  /* ตรวจการตั้งค่าฝั่งเซิร์ฟเวอร์ — ตอบแม้ยังตั้งค่าไม่ครบ จึงไม่ใช้ api() ที่โยน error ทิ้ง */
+  async function diagUsers(){
+    const {data} = await sb.auth.getSession();
+    const token = data && data.session && data.session.access_token;
+    const res = await fetch("/api/users?diag=1", {
+      headers: token ? {Authorization:"Bearer "+token} : {}
+    });
+    if(res.status===404) throw new Error("ไม่พบ /api/users บนเซิร์ฟเวอร์ — deploy ล่าสุดยังไม่มีไฟล์ api/users.js");
+    let out=null; try{ out = await res.json(); }catch(e){ out=null; }
+    if(!out) throw new Error("อ่านผลตรวจไม่ได้ ("+res.status+")");
+    return out;
+  }
+
   const listMembers   = ()   => api("GET");
   const createMember  = (b)  => api("POST", b);
   const updateMember  = (b)  => api("PATCH", b);
@@ -261,7 +274,7 @@ const Store = (() => {
   }
 
   return {init, onAuth, signIn, signOut, displayName, myProfile, logActivity, readActivity,
-          listMembers, createMember, updateMember, deleteMember,
+          listMembers, createMember, updateMember, deleteMember, diagUsers,
           loadAll, save, patch, remove, subscribe, uploadFile, addLink, fileUrl, deleteFile,
           get client(){ return sb; }};
 })();
