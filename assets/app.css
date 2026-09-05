@@ -50,9 +50,15 @@
     color-scheme:dark;
 }
 *{box-sizing:border-box}
+/* ---------- ขนาดตัวอักษรทั้งระบบ ----------
+   ทุก font-size ในไฟล์นี้เป็น rem จึงขยาย/ย่อพร้อมกันทั้งแอปจากค่าเดียวตรงนี้
+   ก = 15.5px (เท่าเดิมก่อนปรับ) · กก = 17px (ค่าเริ่มต้นใหม่) · กกก = 18.5px */
+html{font-size:17px}
+html[data-fs="s"]{font-size:15.5px}
+html[data-fs="l"]{font-size:18.5px}
 body{margin:0;background:var(--ground);color:var(--ink);
-  font-family:"IBM Plex Sans Thai","Noto Sans Thai",system-ui,-apple-system,sans-serif;
-  font-size:15.5px;line-height:1.6;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  font-family:"IBM Plex Sans Thai Looped","IBM Plex Sans Thai","Noto Sans Thai",system-ui,-apple-system,sans-serif;
+  font-size:1.0rem;line-height:1.6;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 h1,h2,h3,h4{font-family:"Noto Serif Thai","IBM Plex Sans Thai",Georgia,serif;
   margin:0;font-weight:600;text-wrap:balance;letter-spacing:0}
 .num{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
@@ -67,21 +73,21 @@ a{color:var(--accent-ink)}
   padding:26px 14px 18px;position:sticky;top:0;height:100vh;overflow:auto}
 .brand{padding:0 12px 22px;margin-bottom:14px;border-bottom:1px solid var(--rail-line);position:relative}
 .brand:after{content:"";position:absolute;left:12px;bottom:-1px;width:38px;height:2px;background:var(--hero-fig);border-radius:2px}
-.brand .mark{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.22em;
+.brand .mark{font-family:"IBM Plex Mono",monospace;font-size:0.7419rem;letter-spacing:.22em;
   text-transform:uppercase;color:var(--brass)}
-.brand h1{font-size:21.5px;line-height:1.3;margin-top:8px;color:var(--rail-ink);font-weight:600}
-.brand p{margin:7px 0 0;font-size:13px;color:var(--rail-ink-2);line-height:1.5}
+.brand h1{font-size:1.3871rem;line-height:1.3;margin-top:8px;color:var(--rail-ink);font-weight:600}
+.brand p{margin:7px 0 0;font-size:0.8387rem;color:var(--rail-ink-2);line-height:1.5}
 .navitem{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:var(--radius-sm);
-  background:none;border:0;width:100%;text-align:left;cursor:pointer;color:var(--rail-ink-2);font-size:14.5px}
+  background:none;border:0;width:100%;text-align:left;cursor:pointer;color:var(--rail-ink-2);font-size:0.9355rem}
 .navitem:hover{background:rgba(255,255,255,.10);color:#fff}
 .navitem[aria-current="true"]{background:var(--rail-active);color:#fff;font-weight:600;
   box-shadow:inset 3px 0 0 var(--hero-fig), 0 2px 10px -4px rgba(0,0,0,.4)}
 .navitem .dot{width:4px;height:4px;border-radius:50%;background:currentColor;opacity:.4;flex:none}
 .navitem[aria-current="true"] .dot{background:var(--brass);opacity:1;box-shadow:0 0 0 3px rgba(154,123,63,.18)}
-.navitem .badge{margin-left:auto;font-size:12px;padding:0 6px;border-radius:3px;line-height:17px;
+.navitem .badge{margin-left:auto;font-size:0.7742rem;padding:0 6px;border-radius:3px;line-height:17px;
   background:rgba(255,255,255,.07);color:var(--rail-ink-2);font-family:"IBM Plex Mono",monospace}
 .railfoot{margin-top:auto;padding:14px 12px 0;border-top:1px solid var(--rail-line);
-  font-size:12.5px;color:var(--rail-ink-2);letter-spacing:.02em}
+  font-size:0.8065rem;color:var(--rail-ink-2);letter-spacing:.02em}
 .railfoot .btn{margin-top:10px;background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.34);color:#fff;font-weight:500}
 .railfoot .btn:hover{background:rgba(255,255,255,.2);color:#fff}
 .main{min-width:0;padding:30px 34px 72px;max-width:1520px}
@@ -90,11 +96,11 @@ a{color:var(--accent-ink)}
 .topbar{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-end;justify-content:space-between;
   padding-bottom:18px;margin-bottom:24px;border-bottom:1px solid var(--line);position:relative}
 .topbar:after{content:"";position:absolute;left:0;bottom:-1px;width:46px;height:1px;background:var(--brass-line)}
-.topbar h2{font-size:26px;letter-spacing:-.01em}
-.topbar .sub{color:var(--ink-3);font-size:14px;margin-top:5px}
+.topbar h2{font-size:1.6774rem;letter-spacing:-.01em}
+.topbar .sub{color:var(--ink-3);font-size:0.9032rem;margin-top:5px}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .btn{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:var(--radius-sm);
-  border:1px solid var(--line-strong);background:var(--surface);cursor:pointer;font-size:14px;color:var(--ink-2)}
+  border:1px solid var(--line-strong);background:var(--surface);cursor:pointer;font-size:0.9032rem;color:var(--ink-2)}
 .btn:hover{border-color:var(--ink-3);color:var(--ink)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#FBFAF8;font-weight:500}
 :root[data-theme="dark"] .btn.primary{color:#101418}
@@ -103,27 +109,27 @@ a{color:var(--accent-ink)}
 :root[data-theme="dark"] .btn.primary:hover{color:#101418}
 .btn.ghost{border-color:transparent;background:transparent;color:var(--ink-3)}
 .btn.ghost:hover{background:var(--surface-2);color:var(--ink)}
-.btn.sm{padding:4px 10px;font-size:13px}
+.btn.sm{padding:4px 10px;font-size:0.8387rem}
 
 /* ---------- cards ---------- */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
 .card-h{display:flex;align-items:baseline;justify-content:space-between;gap:14px;
   padding:15px 18px;border-bottom:1px solid var(--line);position:relative}
 .card-h:before{content:"";position:absolute;left:18px;bottom:-1px;width:30px;height:2px;background:var(--accent);border-radius:2px;opacity:.55}
-.card-h h3{font-size:17px}
-.card-h .hint{font-size:13px;color:var(--ink-3);text-align:right}
+.card-h h3{font-size:1.0968rem}
+.card-h .hint{font-size:0.8387rem;color:var(--ink-3);text-align:right}
 .card-b{padding:18px}
 .grid{display:grid;gap:14px}
 .kpis{gap:0;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));background:var(--surface);
   border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
 .kpi{background:var(--surface);padding:17px 19px 18px;border-right:1px solid var(--line);
   border-bottom:1px solid var(--line)}
-.kpi .lab{font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+.kpi .lab{font-size:0.7419rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
 .kpi .val{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
-  font-size:23.5px;font-weight:500;margin-top:9px;letter-spacing:-.035em;line-height:1.2;
+  font-size:1.5161rem;font-weight:500;margin-top:9px;letter-spacing:-.035em;line-height:1.2;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.kpi .val small{font-size:13.5px;font-weight:400;color:var(--ink-3);margin-left:5px;letter-spacing:0}
-.kpi .note{font-size:13px;color:var(--ink-3);margin-top:7px;line-height:1.5}
+.kpi .val small{font-size:0.871rem;font-weight:400;color:var(--ink-3);margin-left:5px;letter-spacing:0}
+.kpi .note{font-size:0.8387rem;color:var(--ink-3);margin-top:7px;line-height:1.5}
 .kpi.lead{background:var(--surface);box-shadow:inset 0 2px 0 var(--accent)}
 .kpi.lead .val{color:var(--accent-ink)}
 .kpi.lead .lab{color:var(--brass)}
@@ -136,27 +142,27 @@ a{color:var(--accent-ink)}
 .meter .s-paid{background:var(--fill-paid)}
 .meter .s-due{background:var(--fill-due)}
 .meter .s-un{background:var(--unbilled)}
-.legend{display:flex;flex-wrap:wrap;gap:16px;font-size:13px;color:var(--ink-3);margin-top:14px;
+.legend{display:flex;flex-wrap:wrap;gap:16px;font-size:0.8387rem;color:var(--ink-3);margin-top:14px;
   padding-top:12px;border-top:1px solid var(--line)}
 .legend i{width:8px;height:8px;border-radius:2px;display:inline-block;margin-right:6px;vertical-align:0}
 .ctr-row{padding:16px 0;border-bottom:1px solid var(--line)}
 .ctr-row:first-child{padding-top:0}
 .ctr-row:last-child{border-bottom:0;padding-bottom:2px}
 .ctr-head{display:flex;justify-content:space-between;gap:14px;align-items:baseline;margin-bottom:11px;flex-wrap:wrap}
-.ctr-head .nm{font-family:"Noto Serif Thai",serif;font-weight:600;font-size:16px}
-.ctr-head .who{font-size:13px;color:var(--ink-3);margin-top:2px}
-.ctr-figs{display:flex;gap:20px;font-size:13px;color:var(--ink-3);margin-top:10px;flex-wrap:wrap}
-.ctr-figs b{font-family:"IBM Plex Mono",monospace;font-weight:500;color:var(--ink);font-size:13.5px}
+.ctr-head .nm{font-family:"Noto Serif Thai",serif;font-weight:600;font-size:1.0323rem}
+.ctr-head .who{font-size:0.8387rem;color:var(--ink-3);margin-top:2px}
+.ctr-figs{display:flex;gap:20px;font-size:0.8387rem;color:var(--ink-3);margin-top:10px;flex-wrap:wrap}
+.ctr-figs b{font-family:"IBM Plex Mono",monospace;font-weight:500;color:var(--ink);font-size:0.871rem}
 
 /* ---------- table ---------- */
 .tablewrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:14px}
-th{text-align:left;font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);
+table{width:100%;border-collapse:collapse;font-size:0.9032rem}
+th{text-align:left;font-size:0.7097rem;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);
   font-weight:600;padding:11px 12px;border-bottom:1px solid var(--line-strong);white-space:nowrap;background:var(--surface)}
 td{padding:13px 12px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.5}
 tbody tr:last-child td{border-bottom:0}
 tbody tr:hover{background:var(--surface-2)}
-tfoot td{border-top:1px solid var(--line-strong);border-bottom:0;background:var(--surface-2);font-size:13.5px}
+tfoot td{border-top:1px solid var(--line-strong);border-bottom:0;background:var(--surface-2);font-size:0.871rem}
 td.r,th.r{text-align:right}
 td.num{white-space:nowrap;color:var(--ink-2)}
 td.c,th.c{text-align:center}
@@ -164,7 +170,7 @@ td.c,th.c{text-align:center}
 .stripe.late{box-shadow:inset 2px 0 0 var(--late)}
 .stripe.due{box-shadow:inset 2px 0 0 var(--due)}
 .stripe.paid{box-shadow:inset 2px 0 0 var(--fill-paid)}
-.pill{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:3px;font-size:12.5px;
+.pill{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:3px;font-size:0.8065rem;
   font-weight:500;white-space:nowrap;border:1px solid transparent;letter-spacing:.01em}
 .pill:before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;flex:none}
 .pill.paid{background:var(--paid-soft);color:var(--paid);border-color:color-mix(in srgb,var(--paid) 22%,transparent)}
@@ -172,17 +178,17 @@ td.c,th.c{text-align:center}
 .pill.late{background:var(--late-soft);color:var(--late);border-color:color-mix(in srgb,var(--late) 22%,transparent)}
 .pill.info{background:var(--surface-2);color:var(--ink-3);border-color:var(--line)}
 .pill.brass{background:var(--brass-soft);color:var(--brass);border-color:var(--brass-line)}
-.clip{display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--ink-3);white-space:nowrap;
+.clip{display:inline-flex;align-items:center;gap:5px;font-size:0.8387rem;color:var(--ink-3);white-space:nowrap;
   background:transparent;border:1px solid var(--line);border-radius:3px;padding:3px 9px;cursor:pointer;line-height:1.4}
 .clip:hover{border-color:var(--accent);color:var(--accent-ink)}
 .clip.add{border-style:dashed}
 .rowacts{display:flex;gap:2px;justify-content:flex-end}
 .muted{color:var(--ink-3)}
-.sect-title{font-size:11.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--brass);padding:14px 12px 6px}
+.sect-title{font-size:0.7419rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--brass);padding:14px 12px 6px}
 
 /* ---------- filters ---------- */
 .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
-.filters select,.filters input{padding:6px 11px;border-radius:var(--radius-sm);font-size:14px;
+.filters select,.filters input{padding:6px 11px;border-radius:var(--radius-sm);font-size:0.9032rem;
   border:1px solid var(--line-strong);background:var(--surface);color:var(--ink-2)}
 .filters select:hover,.filters input:hover{border-color:var(--ink-3)}
 .filters input[type="search"]{min-width:230px}
@@ -197,9 +203,9 @@ td.c,th.c{text-align:center}
 .tl-item.done:before{border-color:var(--fill-paid);background:var(--fill-paid)}
 .tl-item.pending:before{border-color:var(--fill-due);background:var(--fill-due)}
 .tl-item.milestone:before{border-color:var(--accent);background:var(--accent)}
-.tl-date{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-3);letter-spacing:.04em}
-.tl-title{font-family:"Noto Serif Thai",serif;font-weight:600;font-size:15.5px;margin-top:3px}
-.tl-body{font-size:13.5px;color:var(--ink-3);margin-top:3px}
+.tl-date{font-family:"IBM Plex Mono",monospace;font-size:0.7742rem;color:var(--ink-3);letter-spacing:.04em}
+.tl-title{font-family:"Noto Serif Thai",serif;font-weight:600;font-size:1.0rem;margin-top:3px}
+.tl-body{font-size:0.871rem;color:var(--ink-3);margin-top:3px}
 
 /* ---------- modal / drawer ---------- */
 .scrim{position:fixed;inset:0;background:rgba(12,15,19,.55);backdrop-filter:blur(3px);
@@ -211,9 +217,9 @@ td.c,th.c{text-align:center}
 .modal .foot{display:flex;justify-content:flex-end;gap:8px;padding:15px 20px;border-top:1px solid var(--line);
   background:var(--surface-2);border-radius:0 0 var(--radius) var(--radius)}
 .f-row{display:grid;gap:6px}
-.f-row label{font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.f-row label{font-size:0.7419rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
 .f-row input,.f-row select,.f-row textarea{padding:9px 11px;border:1px solid var(--line-strong);
-  border-radius:var(--radius-sm);background:var(--surface);width:100%;font-size:14.5px}
+  border-radius:var(--radius-sm);background:var(--surface);width:100%;font-size:0.9355rem}
 .f-row input:focus,.f-row select:focus,.f-row textarea:focus{border-color:var(--accent);outline:none;
   box-shadow:0 0 0 3px var(--accent-soft)}
 .f-row textarea{min-height:72px;resize:vertical;line-height:1.6}
@@ -223,21 +229,21 @@ td.c,th.c{text-align:center}
   border-left:1px solid var(--line);z-index:60;display:flex;flex-direction:column;box-shadow:var(--shadow-lift)}
 .drawer .card-b{overflow:auto;flex:1}
 .drop{border:1px dashed var(--line-strong);border-radius:var(--radius);padding:26px 20px;text-align:center;
-  color:var(--ink-3);font-size:14px;cursor:pointer;background:var(--surface-2);line-height:1.7}
+  color:var(--ink-3);font-size:0.9032rem;cursor:pointer;background:var(--surface-2);line-height:1.7}
 .drop.hot{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-soft)}
 .filerow{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
-.filerow .ic.link{background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent-ink);font-size:9px}
+.filerow .ic.link{background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent-ink);font-size:0.5806rem}
 .filerow .ic{width:34px;height:34px;border-radius:3px;background:var(--surface-2);color:var(--ink-3);
-  border:1px solid var(--line);display:grid;place-items:center;font-size:11px;font-weight:600;
+  border:1px solid var(--line);display:grid;place-items:center;font-size:0.7097rem;font-weight:600;
   font-family:"IBM Plex Mono",monospace;letter-spacing:.04em;flex:none}
-.filerow .nm{font-size:14px;word-break:break-all;line-height:1.4}
-.filerow .mt{font-size:12px;color:var(--ink-3);font-family:"IBM Plex Mono",monospace;margin-top:2px}
+.filerow .nm{font-size:0.9032rem;word-break:break-all;line-height:1.4}
+.filerow .mt{font-size:0.7742rem;color:var(--ink-3);font-family:"IBM Plex Mono",monospace;margin-top:2px}
 .thumb{max-width:100%;border-radius:var(--radius-sm);border:1px solid var(--line);margin-top:10px}
 .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:var(--ink);color:var(--ground);
-  padding:11px 20px;border-radius:4px;font-size:14px;z-index:80;box-shadow:var(--shadow-lift);max-width:90vw}
+  padding:11px 20px;border-radius:4px;font-size:0.9032rem;z-index:80;box-shadow:var(--shadow-lift);max-width:90vw}
 .banner{display:flex;gap:10px;align-items:center;padding:11px 16px;border-radius:var(--radius-sm);
-  background:var(--brass-soft);color:var(--brass);font-size:13.5px;margin-bottom:20px;border:1px solid var(--brass-line)}
-.empty{padding:52px 20px;text-align:center;color:var(--ink-3);font-size:14px}
+  background:var(--brass-soft);color:var(--brass);font-size:0.871rem;margin-bottom:20px;border:1px solid var(--brass-line)}
+.empty{padding:52px 20px;text-align:center;color:var(--ink-3);font-size:0.9032rem}
 .bar{height:4px;border-radius:2px;background:var(--sunken);overflow:hidden;min-width:70px}
 .bar span{display:block;height:100%;background:var(--accent)}
 @media(prefers-reduced-motion:no-preference){
@@ -252,19 +258,19 @@ td.c,th.c{text-align:center}
   box-shadow:0 20px 50px -34px rgba(12,16,22,.7)}
 .hero-main{padding:24px 26px 26px;position:relative}
 .hero-main:after{content:"";position:absolute;left:26px;top:0;width:52px;height:3px;background:var(--hero-fig);border-radius:0 0 3px 3px}
-.hero-lab{font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;color:#BFD8EE;font-weight:600}
-.hero-fig{color:var(--hero-fig);font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-size:52px;font-weight:600;
+.hero-lab{font-size:0.7419rem;letter-spacing:.2em;text-transform:uppercase;color:#BFD8EE;font-weight:600}
+.hero-fig{color:var(--hero-fig);font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-size:3.3548rem;font-weight:600;
   letter-spacing:-.04em;line-height:1.05;margin-top:14px}
-.hero-fig small{font-size:17px;font-weight:400;color:var(--rail-ink-2);margin-left:9px;letter-spacing:0}
-.hero-sub{font-size:14px;color:#C7D8EC;margin-top:12px;line-height:1.6}
+.hero-fig small{font-size:1.0968rem;font-weight:400;color:var(--rail-ink-2);margin-left:9px;letter-spacing:0}
+.hero-sub{font-size:0.9032rem;color:#C7D8EC;margin-top:12px;line-height:1.6}
 .hero-sub .warn{color:#FFB3A6;font-weight:600}
 .hero-split{padding:24px 26px;background:rgba(255,255,255,.07);display:flex;flex-direction:column;gap:11px;justify-content:center}
-.hs-row{display:grid;grid-template-columns:88px 1fr auto;align-items:center;gap:12px;font-size:13.5px}
+.hs-row{display:grid;grid-template-columns:88px 1fr auto;align-items:center;gap:12px;font-size:0.871rem}
 .hs-nm{color:#BDD2E8}
 .hs-bar{height:6px;border-radius:3px;background:rgba(255,255,255,.09);overflow:hidden}
 .hs-bar i{display:block;height:100%;background:var(--fill-due);border-radius:3px}
-.hs-val{font-size:14px;font-weight:600;color:#FFFFFF}
-.hs-foot{margin-top:6px;padding-top:11px;border-top:1px solid rgba(255,255,255,.15);font-size:13px;color:#B7CBE2}
+.hs-val{font-size:0.9032rem;font-weight:600;color:#FFFFFF}
+.hs-foot{margin-top:6px;padding-top:11px;border-top:1px solid rgba(255,255,255,.15);font-size:0.8387rem;color:#B7CBE2}
 
 /* ---------- อายุหนี้ ---------- */
 .agewrap{display:flex;align-items:center;gap:9px}
@@ -276,13 +282,13 @@ td.c,th.c{text-align:center}
 /* ---------- ตัวบ่งชี้เอกสาร ---------- */
 .docchip{display:inline-flex;gap:3px;align-items:center;background:none;border:0;padding:2px;cursor:pointer}
 .docchip i{font-style:normal;width:22px;height:22px;border-radius:4px;display:grid;place-items:center;
-  font-size:12.5px;font-weight:600;border:1px solid var(--line);color:var(--ink-3);background:var(--surface-2)}
+  font-size:0.8065rem;font-weight:600;border:1px solid var(--line);color:var(--ink-3);background:var(--surface-2)}
 .docchip i.on{background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent-ink)}
 .docchip i.miss{border-style:dashed;border-color:var(--due);color:var(--due);background:transparent}
 /* ประเภทที่ยังไม่มีไฟล์ แต่ไม่ได้บังคับ — อย่าให้ดูเหมือนขาดเอกสาร */
 .docchip i.opt{border-style:dotted;border-color:var(--line-strong);color:var(--ink-3);background:transparent;opacity:.6}
 .docchip:hover i{border-color:var(--accent)}
-.docchip .xtra{font-size:12px;color:var(--ink-3);font-family:"IBM Plex Mono",monospace;margin-left:2px}
+.docchip .xtra{font-size:0.7742rem;color:var(--ink-3);font-family:"IBM Plex Mono",monospace;margin-left:2px}
 
 /* ---------- ช่องเอกสารในแผงแนบไฟล์ ---------- */
 .docslot{border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;background:var(--surface)}
@@ -293,10 +299,10 @@ td.c,th.c{text-align:center}
 .docslot.covered .st{color:var(--paid)}
 .docslot header{display:flex;align-items:center;gap:11px}
 .docslot .ab{width:28px;height:28px;border-radius:5px;display:grid;place-items:center;flex:none;
-  background:var(--accent-soft);color:var(--accent-ink);font-weight:700;font-size:13.5px}
+  background:var(--accent-soft);color:var(--accent-ink);font-weight:700;font-size:0.871rem}
 .docslot.needed .ab{background:transparent;border:1px dashed var(--due);color:var(--due)}
-.docslot .lb{font-weight:600;font-size:14.5px}
-.docslot .st{font-size:12.5px;color:var(--ink-3)}
+.docslot .lb{font-weight:600;font-size:0.9355rem}
+.docslot .st{font-size:0.8065rem;color:var(--ink-3)}
 .docslot header .btn{margin-left:auto}
 .docslot header .btn+.btn{margin-left:6px}
 .docslot .filerow:last-child{border-bottom:0;padding-bottom:0}
@@ -307,51 +313,51 @@ td.c,th.c{text-align:center}
 .drow{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
 .drow:last-child{border-bottom:0}
 .dtype{width:30px;height:30px;flex:none;border-radius:6px;display:grid;place-items:center;font-weight:700;
-  font-size:13px;background:var(--accent-soft);color:var(--accent-ink)}
+  font-size:0.8387rem;background:var(--accent-soft);color:var(--accent-ink)}
 .dinfo{flex:1;min-width:0}
-.dname{font-size:14px;font-weight:500;word-break:break-word;line-height:1.4}
-.dmeta{font-size:12.5px;color:var(--ink-3);margin-top:2px}
+.dname{font-size:0.9032rem;font-weight:500;word-break:break-word;line-height:1.4}
+.dmeta{font-size:0.8065rem;color:var(--ink-3);margin-top:2px}
 .dacts{display:flex;gap:4px;flex:none}
 @media(max-width:880px){
   .drow{flex-wrap:wrap}
   .dacts{width:100%;justify-content:flex-end}
 }
 .ftrow{display:flex;align-items:center;gap:8px;flex:1 1 100%;order:5;min-width:0;
-  margin-top:2px;font-size:12px;color:var(--ink-3);cursor:pointer}
+  margin-top:2px;font-size:0.7742rem;color:var(--ink-3);cursor:pointer}
 .ftrow>span{flex:none;letter-spacing:.02em}
 .ftype{flex:1;min-width:0;padding:5px 8px;border:1px solid var(--line-strong);border-radius:4px;
-  background:var(--surface-2);font-size:12.5px;color:var(--ink-2);cursor:pointer}
+  background:var(--surface-2);font-size:0.8065rem;color:var(--ink-2);cursor:pointer}
 .okrow{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px dashed var(--line-strong);
-  border-radius:var(--radius);background:var(--surface-2);font-size:13.5px;cursor:pointer}
+  border-radius:var(--radius);background:var(--surface-2);font-size:0.871rem;cursor:pointer}
 .okrow input{margin-top:3px;width:18px;height:18px;flex:none}
-.okrow small{font-size:12px;line-height:1.5;display:block;margin-top:2px}
+.okrow small{font-size:0.7742rem;line-height:1.5;display:block;margin-top:2px}
 .notecard{border-color:var(--brass-line);background:var(--brass-soft)}
 .notecard .card-h{border-bottom-color:var(--brass-line)}
 .notecard .card-h:before{background:var(--brass)}
 .notecard .card-b{background:var(--surface);border-radius:0 0 var(--radius) var(--radius)}
-.ctr-terms{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);display:grid;gap:6px;font-size:13px}
+.ctr-terms{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);display:grid;gap:6px;font-size:0.8387rem}
 .ctr-terms div{display:flex;justify-content:space-between;gap:12px}
 .ctr-terms span{color:var(--ink-3)}
 .ctr-docs{display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);flex-wrap:wrap}
 
 /* ---------- แถวงานที่ต้องติดตาม ---------- */
 .tk{display:flex;gap:11px;align-items:flex-start}
-.tk-t{font-weight:600;font-size:14px;line-height:1.45}
-.tk-s{font-size:13px;color:var(--ink-3);margin-top:2px}
+.tk-t{font-weight:600;font-size:0.9032rem;line-height:1.45}
+.tk-s{font-size:0.8387rem;color:var(--ink-3);margin-top:2px}
 
 /* ---------- แถบบนสำหรับมือถือ ---------- */
 .mobilebar{display:none;align-items:center;gap:12px;padding:10px 14px;color:var(--rail-ink);
   background:linear-gradient(100deg,var(--rail-a),var(--rail-b));
   position:sticky;top:0;z-index:45;border-bottom:1px solid var(--rail-line)}
-.mb-title{font-family:"Noto Serif Thai",serif;font-weight:600;font-size:17px}
-.mb-sub{margin-left:auto;font-size:13px;color:var(--rail-ink-2);letter-spacing:.02em}
+.mb-title{font-family:"Noto Serif Thai",serif;font-weight:600;font-size:1.0968rem}
+.mb-sub{margin-left:auto;font-size:0.8387rem;color:var(--rail-ink-2);letter-spacing:.02em}
 .hamb{display:grid;gap:4px;width:40px;height:40px;place-content:center;background:none;border:1px solid var(--rail-line);
   border-radius:8px;cursor:pointer;padding:0;flex:none}
 .hamb span{display:block;width:17px;height:1.5px;background:var(--rail-ink);border-radius:2px}
 .navscrim{position:fixed;inset:0;background:rgba(8,10,13,.5);z-index:60;backdrop-filter:blur(2px)}
 
 @media(max-width:880px){
-  body{font-size:16.5px}
+  body{font-size:1.0645rem}
   .mobilebar{display:flex}
   .navscrim[hidden]{display:none}
   .shell{grid-template-columns:1fr;background-image:none}
@@ -363,15 +369,15 @@ td.c,th.c{text-align:center}
   .main{padding:18px 14px 90px;max-width:none}
 
   .topbar{flex-direction:column;align-items:stretch;gap:12px;padding-bottom:14px;margin-bottom:18px}
-  .topbar h2{font-size:22.5px}
+  .topbar h2{font-size:1.4516rem}
   .toolbar{gap:8px}
   .toolbar .btn{flex:1;justify-content:center;padding:10px 12px}
 
   .kpis{grid-template-columns:1fr 1fr}
   .kpi{padding:13px 14px 14px}
-  .kpi .val{font-size:21px}
-  .kpi.go:after{top:12px;right:11px;font-size:17px}
-  .kpi .note{font-size:12.5px}
+  .kpi .val{font-size:1.3548rem}
+  .kpi.go:after{top:12px;right:11px;font-size:1.0968rem}
+  .kpi .note{font-size:0.8065rem}
 
   /* .kpis มีคอลัมน์ของตัวเอง — อย่าให้ !important ของ .grid ทับ */
   .grid:not(.kpis){grid-template-columns:1fr !important}
@@ -391,7 +397,7 @@ td.c,th.c{text-align:center}
   tbody tr:hover{background:var(--surface)}
   td{border:0;padding:5px 0;display:flex;gap:14px;justify-content:space-between;align-items:baseline;
     text-align:right !important;white-space:normal !important}
-  td:before{content:attr(data-l);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);
+  td:before{content:attr(data-l);font-size:0.7097rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);
     font-weight:600;flex:none;text-align:left;padding-top:2px}
   td:not([data-l]):before{content:none}
   td[data-l="รายละเอียดงาน"],td[data-l="หมวดงาน"],td[data-l="เหตุผล / สาเหตุ"],td[data-l="ชื่อไฟล์"],td[data-l="รายการ"]{
@@ -399,8 +405,8 @@ td.c,th.c{text-align:center}
   td[data-l="รายละเอียดงาน"]:before,td[data-l="หมวดงาน"]:before,
   td[data-l="เหตุผล / สาเหตุ"]:before,td[data-l="ชื่อไฟล์"]:before,
   td[data-l="รายการ"]:before{display:block;margin-bottom:4px}
-  td[data-l="ยอดที่ต้องโอน"]{font-size:18px;font-weight:700}
-  td[data-l="ยอดจ่ายจริง"]{font-size:17px;font-weight:600}
+  td[data-l="ยอดที่ต้องโอน"]{font-size:1.1613rem;font-weight:700}
+  td[data-l="ยอดจ่ายจริง"]{font-size:1.0968rem;font-weight:600}
   .stripe{box-shadow:none !important}
   tbody tr:has(.stripe.late){border-left:3px solid var(--late)}
   tbody tr:has(.stripe.due){border-left:3px solid var(--due)}
@@ -414,7 +420,7 @@ td.c,th.c{text-align:center}
 
   .hero{grid-template-columns:1fr}
   .hero-main{padding:20px}
-  .hero-fig{font-size:38.5px}
+  .hero-fig{font-size:2.4839rem}
   .hero-split{padding:16px 20px 20px}
   .hs-row{grid-template-columns:92px 1fr auto}
   .agewrap{justify-content:flex-end}
@@ -429,10 +435,10 @@ td.c,th.c{text-align:center}
   .modal .foot{position:sticky;bottom:0;border-radius:0}
   .modal .foot .btn{flex:1;justify-content:center;padding:11px}
   .f-2,.f-3{grid-template-columns:1fr}
-  .f-row input,.f-row select,.f-row textarea{padding:11px 12px;font-size:18px}
+  .f-row input,.f-row select,.f-row textarea{padding:11px 12px;font-size:1.1613rem}
   .drawer{width:100%;top:auto;height:88dvh;border-radius:14px 14px 0 0;border-left:0;border-top:1px solid var(--line)}
   .toast{bottom:16px;width:calc(100% - 28px);text-align:center}
-  .tl-title{font-size:14.5px}
+  .tl-title{font-size:0.9355rem}
 }
 @media(max-width:359px){
   .kpis{grid-template-columns:1fr}
@@ -456,7 +462,7 @@ td.c,th.c{text-align:center}
 .hero-sub .golink.warn:hover{color:#FFD2C9;border-bottom-color:#FFD2C9}
 /* KPI ที่คลิกได้ */
 .kpi.go:hover{background:var(--surface-2)}
-.kpi.go:after{content:"›";position:absolute;top:15px;right:16px;font-size:19px;line-height:1;
+.kpi.go:after{content:"›";position:absolute;top:15px;right:16px;font-size:1.2258rem;line-height:1;
   color:var(--ink-3);opacity:.42;transition:opacity .13s ease,transform .13s ease}
 .kpi.go{position:relative}
 .kpi.go:hover:after,.kpi.go:focus-visible:after{opacity:1;transform:translateX(2px);color:var(--accent)}
@@ -467,13 +473,13 @@ td.c,th.c{text-align:center}
 /* แถวความคืบหน้ารายสัญญา */
 .ctr-row.go{border-radius:var(--radius-sm);padding-left:10px;padding-right:34px;margin-left:-10px;margin-right:-10px}
 .ctr-row.go:hover{background:var(--surface-2)}
-.ctr-row.go:after{content:"›";position:absolute;top:18px;right:12px;font-size:19px;line-height:1;
+.ctr-row.go:after{content:"›";position:absolute;top:18px;right:12px;font-size:1.2258rem;line-height:1;
   color:var(--ink-3);opacity:.42;transition:opacity .13s ease}
 .ctr-row.go{position:relative}
 .ctr-row.go:hover:after,.ctr-row.go:focus-visible:after{opacity:1;color:var(--accent)}
 /* การ์ด "ต้องติดตาม" */
 .tk.go{border-radius:var(--radius-sm);padding:8px 28px 8px 10px;margin:-8px -10px;position:relative}
-.tk.go:after{content:"›";position:absolute;top:9px;right:10px;font-size:17px;line-height:1;
+.tk.go:after{content:"›";position:absolute;top:9px;right:10px;font-size:1.0968rem;line-height:1;
   color:var(--ink-3);opacity:.4;transition:opacity .13s ease}
 .tk.go:hover{background:var(--surface-2)}
 .tk.go:hover:after,.tk.go:focus-visible:after{opacity:1;color:var(--accent)}
@@ -491,10 +497,10 @@ tr.flash>td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .ghlate{color:var(--late);font-weight:600}
 
 /* สรุปจำนวนงานขออนุมัติ ในหัวการ์ด */
-.rfatally{display:inline-block;font-size:13px;color:var(--ink-2);letter-spacing:.01em}
+.rfatally{display:inline-block;font-size:0.8387rem;color:var(--ink-2);letter-spacing:.01em}
 .rfatally b{font-family:"IBM Plex Mono",monospace;font-weight:600;color:var(--ink)}
 .rfatally b.ghlate{color:var(--late)}
-@media(max-width:880px){.rfatally{font-size:13.5px;line-height:1.7}}
+@media(max-width:880px){.rfatally{font-size:0.871rem;line-height:1.7}}
 
 /* ---------- การ์ดรายการค้างจ่ายบนมือถือ: ไม่ซ้ำชื่อคอลัมน์ทุกบรรทัด ---------- */
 @media(max-width:880px){
@@ -506,11 +512,11 @@ tr.flash>td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 
   .duetbl tbody tr>td[data-l="รายการ"]{grid-column:1/-1;padding:0 0 8px;
     margin-bottom:7px;border-bottom:1px dashed var(--line)}
-  .duetbl td[data-l="เลขที่ใบเบิก"]{grid-column:1;font-size:14px;font-weight:600}
+  .duetbl td[data-l="เลขที่ใบเบิก"]{grid-column:1;font-size:0.9032rem;font-weight:600}
   .duetbl td[data-l="ยอดที่ต้องโอน"]{grid-column:2;grid-row:2/5;align-self:center;
-    text-align:right !important;font-size:21px;font-weight:700}
+    text-align:right !important;font-size:1.3548rem;font-weight:700}
   .duetbl td[data-l="ยื่นเมื่อ"],.duetbl td[data-l="ครบกำหนดจ่าย"]{
-    grid-column:1;font-size:13.5px;color:var(--ink-3)}
+    grid-column:1;font-size:0.871rem;color:var(--ink-3)}
   /* คำนำหน้าสั้นๆ ให้อ่านเป็นประโยค ไม่ใช่ป้ายหัวคอลัมน์ */
   .duetbl td[data-l="ยื่นเมื่อ"]:before{content:"ยื่นเบิก " !important}
   .duetbl td[data-l="ครบกำหนดจ่าย"]:before{content:"ครบกำหนดจ่าย " !important}
@@ -529,27 +535,38 @@ tr.flash>td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
   .duetbl tfoot td{background:none !important;border:0 !important;border-radius:0 !important;
     padding:0 !important;margin:0 !important;display:block;text-align:left !important}
   .duetbl tfoot td:empty{display:none}
-  .duetbl tfoot td:nth-child(2){text-align:right !important;font-size:19px;font-weight:700}
+  .duetbl tfoot td:nth-child(2){text-align:right !important;font-size:1.2258rem;font-weight:700}
 }
 
 /* ---------- ป้ายสิทธิ์แอดมินในแถบซ้าย ---------- */
-.rolechip{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:3px;font-size:11px;
+.rolechip{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:3px;font-size:0.7097rem;
   font-weight:600;letter-spacing:.04em;background:var(--brass);color:#1A1508;vertical-align:1px}
 .whoami{line-height:1.45}
-.wa-lab{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--rail-ink-2);opacity:.75}
-.wa-nm{font-size:14px;font-weight:600;color:var(--rail-ink);margin-top:3px;word-break:break-word}
-.wa-id{font-size:12px;color:var(--rail-ink-2);margin-top:1px}
+.wa-lab{font-size:0.7097rem;letter-spacing:.14em;text-transform:uppercase;color:var(--rail-ink-2);opacity:.75}
+.wa-nm{font-size:0.9032rem;font-weight:600;color:var(--rail-ink);margin-top:3px;word-break:break-word}
+.wa-id{font-size:0.7742rem;color:var(--rail-ink-2);margin-top:1px}
 
 /* ---------- ผลตรวจการตั้งค่าหน้าผู้ใช้งาน ---------- */
 .diag{display:grid;gap:8px;margin-top:4px}
 .dgrow{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--line);
-  border-radius:var(--radius);background:var(--surface-2);font-size:13.5px;line-height:1.5}
+  border-radius:var(--radius);background:var(--surface-2);font-size:0.871rem;line-height:1.5}
 .dgrow i{font-style:normal;font-weight:700;width:18px;flex:none;text-align:center;line-height:1.5}
-.dgrow small{display:block;color:var(--ink-3);font-size:12.5px;line-height:1.5;margin-top:2px}
+.dgrow small{display:block;color:var(--ink-3);font-size:0.8065rem;line-height:1.5;margin-top:2px}
 .dgrow.ok  i{color:var(--paid)}
 .dgrow.bad{background:var(--late-soft);border-color:color-mix(in srgb,var(--late) 32%,transparent)}
 .dgrow.bad i{color:var(--late)}
 .dgrow.unk i{color:var(--ink-3)}
 .dgnext{margin-top:4px;padding:11px 13px;border-radius:var(--radius);
-  background:var(--brass-soft);border:1px solid var(--brass-line);font-size:13.5px;line-height:1.6}
+  background:var(--brass-soft);border:1px solid var(--brass-line);font-size:0.871rem;line-height:1.6}
 .dgnext b{display:block;margin-bottom:2px}
+
+/* ---------- ปุ่มปรับขนาดตัวอักษร (ก / กก / กกก) ---------- */
+/* ตั้งเป็น px คงที่ ไม่ใช้ rem — ปุ่มต้องไม่ขยายตามตัวเองตอนกด */
+/* ป้ายอยู่บรรทัดบน ปุ่มเรียงบรรทัดล่าง — รางเมนูกว้าง 250px ถ้าวางบรรทัดเดียวปุ่มสุดท้ายจะตกบรรทัด */
+.fsrow{display:flex;align-items:center;gap:6px;margin-top:12px;flex-wrap:wrap}
+.fsrow span{font-size:12px;color:var(--rail-ink-2);letter-spacing:.02em;flex:0 0 100%;margin-bottom:2px}
+.fsbtn{min-width:34px;height:30px;padding:0 8px;line-height:1;cursor:pointer;
+  border:1px solid rgba(255,255,255,.34);background:rgba(255,255,255,.10);color:var(--rail-ink);
+  border-radius:var(--radius-sm);font-family:"Noto Serif Thai","IBM Plex Sans Thai Looped",serif}
+.fsbtn:hover{background:rgba(255,255,255,.2)}
+.fsbtn[aria-pressed="true"]{background:var(--hero-fig);border-color:var(--hero-fig);color:#1A1206;font-weight:600}

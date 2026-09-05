@@ -1717,6 +1717,24 @@ function closeNav(){ document.querySelector(".rail").classList.remove("open");
   if(sc) sc.onclick=closeNav;
   addEventListener("keydown",e=>{ if(e.key==="Escape") closeNav(); });
 })();
+/* ---------- ขนาดตัวอักษร ก / กก / กกก ----------
+   จำไว้ในเครื่องของแต่ละคน ไม่ยุ่งกับฐานข้อมูล — คนละเครื่องตั้งคนละขนาดได้ */
+const FS_KEY="nm74.fs";
+function applyFs(v){
+  const size = (v==="s"||v==="l") ? v : "m";
+  if(size==="m") document.documentElement.removeAttribute("data-fs");
+  else document.documentElement.setAttribute("data-fs", size);
+  document.querySelectorAll(".fsbtn").forEach(b=>
+    b.setAttribute("aria-pressed", String(b.dataset.fs===size)));
+  try{ localStorage.setItem(FS_KEY, size); }catch(e){}
+}
+/* อ่านค่าที่เคยตั้งไว้ตั้งแต่ตอนเปิดหน้า — โหมดส่วนตัวหรือปิดคุกกี้ก็ต้องไม่พัง */
+(function(){ let saved=null; try{ saved=localStorage.getItem(FS_KEY); }catch(e){}
+  applyFs(saved||"m"); })();
+document.addEventListener("click",e=>{
+  const b=e.target.closest(".fsbtn"); if(b) applyFs(b.dataset.fs);
+});
+
 $("#themeBtn").onclick=()=>{
   const cur=document.documentElement.getAttribute("data-theme");
   const dark=cur? cur==="dark" : matchMedia("(prefers-color-scheme: dark)").matches;
