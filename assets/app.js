@@ -1155,7 +1155,11 @@ function viewSetup(){
 /* ---------- ผู้ใช้งาน (เฉพาะแอดมิน) ---------- */
 async function loadMembers(){
   try{ const r = await Store.listMembers(); S.members = r.members||[]; S.me = r.me||""; S.usersErr=""; S.usersDiag=null; }
-  catch(e){ S.members=[]; S.usersErr = e.message||"โหลดรายชื่อไม่สำเร็จ"; }
+  catch(e){
+    S.members=[]; S.usersErr = e.message||"โหลดรายชื่อไม่สำเร็จ";
+    /* ตรวจการตั้งค่าให้เลยทันที ไม่ต้องรอให้ผู้ใช้ไปหาปุ่มเอง */
+    try{ S.usersDiag = await Store.diagUsers(); }catch(err){ S.usersDiag = null; }
+  }
   try{ S.acts = await Store.readActivity(300, S.actUser||""); S.actErr=""; }
   catch(e){ S.acts=[]; S.actErr = "ยังไม่ได้สร้างตารางประวัติ — รัน supabase/migration-2026-09-activity.sql"; }
 }
@@ -1232,13 +1236,13 @@ function viewUsers(){
 
   if(S.usersErr){
     $("#view").innerHTML =
-      '<div class="card notecard"><div class="card-h"><h3>ยังใช้งานหน้านี้ไม่ได้</h3>'+
-      '<span class="hint"><button class="btn ghost sm" data-act="diag-users">ตรวจการตั้งค่า</button></span></div>'+
+      '<div class="card notecard"><div class="card-h"><h3>ยังใช้งานหน้านี้ไม่ได้</h3></div>'+
       '<div class="card-b" style="line-height:1.75">'+
-      '<p style="margin:0 0 10px">'+esc(S.usersErr)+'</p>'+
+      '<p style="margin:0 0 12px">'+esc(S.usersErr)+'</p>'+
       (S.usersDiag ? diagHtml(S.usersDiag) :
-        '<p class="muted" style="margin:0">กด <b>ตรวจการตั้งค่า</b> ด้านบน ระบบจะบอกว่าติดตรงไหน '+
-        'โดยไม่ต้องเปิดดูคีย์เอง</p>')+
+        '<p class="muted" style="margin:0 0 12px">ตรวจการตั้งค่าอัตโนมัติไม่สำเร็จ — '+
+        'อาจยังไม่ได้ deploy เวอร์ชันล่าสุด</p>')+
+      '<div style="margin-top:12px"><button class="btn ghost sm" data-act="diag-users">ตรวจอีกครั้ง</button></div>'+
       '</div></div>';
     return;
   }
