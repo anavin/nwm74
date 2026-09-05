@@ -186,6 +186,16 @@ async function boot(){
   if(!ok){ showConfigHelp(); return; }
   Store.onAuth(async session=>{
     if(!session){ showLogin(); return; }
+    /* โทเคนยังไม่หมดอายุ แต่เซสชันฝั่งเซิร์ฟเวอร์อาจถูกลบไปแล้ว (เช่นหลังเปลี่ยนรหัสผ่าน)
+       ถ้าปล่อยไว้ แอปจะดูเหมือนใช้ได้ แต่อะไรที่ต้องยืนยันตัวตนจริงจะพังแบบงงๆ */
+    /* ห่อไว้ — เช็คเซสชันพังไม่ควรทำให้ทั้งแอปเปิดไม่ขึ้น */
+    let sess = "ok";
+    try{ if(Store.sessionState) sess = await Store.sessionState(); }catch(e){ sess = "ok"; }
+    if(sess === "dead"){
+      try{ await Store.signOutHard(); }catch(e){}
+      showLogin("เซสชันถูกยกเลิก (มักเกิดหลังเปลี่ยนรหัสผ่าน) กรุณาล็อกอินใหม่");
+      return;
+    }
     hideLogin();
     const prof = await Store.myProfile();
     S.role = prof.role;
@@ -1212,6 +1222,7 @@ function diagHtml(d){
                            : "ยังไม่มีแถวของบัญชีนี้")));
 
   /* บอกขั้นตอนถัดไปข้อเดียว — ข้อแรกที่ยังไม่ผ่าน */
+  const dt = (d.auth && d.auth.detail) || "";
   let next = "";
   if(!d.url.set || !d.key.set)
     next = "ไปที่ Vercel → Settings → Environment Variables ใส่ค่าที่ขาด ติ๊กครบทั้ง 3 environment แล้ว deploy ใหม่หนึ่งครั้ง";
@@ -1227,6 +1238,13 @@ function diagHtml(d){
            "แล้ววางใหม่ใน Vercel และ deploy อีกครั้ง";
   else if(d.token.expired===true)
     next = "โทเคนหมดอายุจริง — ออกจากระบบแล้วล็อกอินใหม่";
+  else if(/session_not_found/.test(dt))
+    next = "เซสชันนี้ถูกยกเลิกที่ฝั่ง Supabase แล้ว (มักเกิดหลังเปลี่ยนรหัสผ่าน หรือถูกสั่งออกจากระบบทุกเครื่อง) — "+
+           "โทเคนในเครื่องยังไม่หมดอายุเลยดูเหมือนยังล็อกอินอยู่ · กดปุ่มล่างเพื่อล็อกอินใหม่";
+  else if(/user_not_found/.test(dt))
+    next = "บัญชีที่อยู่ในโทเคนไม่มีในระบบแล้ว (อาจถูกลบ) — ล็อกอินใหม่ด้วยบัญชีที่ยังใช้งานอยู่";
+  else if(/bad_jwt|invalid/i.test(dt))
+    next = "โทเคนใช้ไม่ได้ — ล็อกอินใหม่";
   else if(d.auth && !d.auth.ok)
     next = "คีย์ใช้ได้และโทเคนยังไม่หมดอายุ แต่ Supabase ปฏิเสธเมื่อใช้คู่กัน (ตอบ "+d.auth.status+") — "+
            "ส่งข้อความในบรรทัดสีแดงให้ผมดูได้เลย";
@@ -1239,8 +1257,16 @@ function diagHtml(d){
   else
     next = "ทุกอย่างผ่านแล้ว — กดรีเฟรชหน้าอีกครั้ง";
 
+  /* ถ้าแก้ได้ด้วยการล็อกอินใหม่ ให้ปุ่มมาเลย ไม่ต้องไปหาเอง */
+  /* ถ้าคีย์เองพัง การล็อกอินใหม่ไม่ช่วยอะไร — อย่าเสนอปุ่มให้เข้าใจผิด */
+  const keyBad = d.keyAlone && d.keyAlone.ok === false;
+  const relogin = !keyBad && (/session_not_found|user_not_found|bad_jwt|invalid/i.test(dt)
+                              || d.token.expired===true || !d.token.sent);
   return '<div class="diag">'+items.join("")+
-    '<div class="dgnext"><b>ต้องทำต่อ</b> '+esc(next)+'</div></div>';
+    '<div class="dgnext"><b>ต้องทำต่อ</b> '+esc(next)+
+      (relogin ? '<div style="margin-top:10px"><button class="btn primary sm" data-act="relogin">'+
+                 'ออกจากระบบแล้วล็อกอินใหม่</button></div>' : '')+
+    '</div></div>';
 }
 
 function viewUsers(){
@@ -1652,6 +1678,7 @@ document.addEventListener("click",async e=>{
     if(a==="new-contract") editContract(null);
     if(a==="new-user") editUser(null);
     if(a==="act-all"){ S.actUser=""; await loadMembers(); renderAll(); }
+    if(a==="relogin"){ await Store.signOutHard(); location.reload(); return; }
     if(a==="diag-users"){
       t.disabled=true; t.textContent="กำลังตรวจ…";
       try{ S.usersDiag = await Store.diagUsers(); }
@@ -1740,7 +1767,7 @@ $("#themeBtn").onclick=()=>{
   const dark=cur? cur==="dark" : matchMedia("(prefers-color-scheme: dark)").matches;
   document.documentElement.setAttribute("data-theme", dark?"light":"dark");
 };
-function showLogin(){
+function showLogin(msg){
   document.body.classList.add("locked");
   $("#overlay").innerHTML='<div class="scrim" style="align-items:center"><div class="modal" style="width:min(400px,100%)">'+
     '<div class="card-h"><h3>เข้าสู่ระบบ</h3></div>'+
@@ -1749,7 +1776,7 @@ function showLogin(){
       '<input id="lg_email" type="text" autocomplete="username" autocapitalize="none" '+
       'spellcheck="false" placeholder="เช่น anavin" required></div>'+
       '<div class="f-row"><label for="lg_pw">รหัสผ่าน</label><input id="lg_pw" type="password" autocomplete="current-password" required></div>'+
-      '<div id="lg_err" class="muted" style="font-size:13.5px;color:var(--late)"></div>'+
+      '<div id="lg_err" class="muted" style="font-size:13.5px;color:var(--late)">'+esc(msg||"")+'</div>'+
     '</form>'+
     '<div class="foot"><button class="btn primary" id="lg_go">เข้าสู่ระบบ</button></div></div></div>';
   const go=async()=>{

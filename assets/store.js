@@ -90,6 +90,26 @@ const Store = (() => {
     if(error) throw error;
   }
   async function signOut(){ await sb.auth.signOut(); }
+  /* ล้างเซสชันแบบไม่สนว่าเซิร์ฟเวอร์จะตอบอะไร
+     เซสชันตายแล้ว signOut ปกติอาจ error ได้ ต้องล้างของในเครื่องให้เกลี้ยงอยู่ดี */
+  async function signOutHard(){
+    try{ await sb.auth.signOut({scope:"local"}); }catch(e){}
+    try{ await sb.auth.signOut(); }catch(e){}
+    try{ Object.keys(localStorage).filter(k=>/^sb-.*-auth-token/.test(k))
+           .forEach(k=>localStorage.removeItem(k)); }catch(e){}
+  }
+  /* เซสชันยังมีชีวิตอยู่ไหม
+     โทเคนที่ยังไม่หมดอายุ ไม่ได้แปลว่าใช้ได้ — ถ้าเปลี่ยนรหัสผ่านหรือถูกสั่งออกจากระบบทุกเครื่อง
+     แถวเซสชันฝั่ง Supabase จะถูกลบ แต่โทเคนในเครื่องยังอยู่และยังอ่านข้อมูลผ่าน PostgREST ได้
+     (PostgREST ตรวจแค่ลายเซ็นกับวันหมดอายุ) แอปเลยดูเหมือนปกติทั้งที่เซสชันตายแล้ว */
+  async function sessionState(){
+    const {data} = await sb.auth.getSession();
+    if(!(data && data.session)) return "none";
+    const {error} = await sb.auth.getUser();
+    if(!error) return "ok";
+    const m = String((error && error.message) || "") + " " + String((error && error.code) || "");
+    return /session_not_found|user_not_found|bad_jwt|jwt|session/i.test(m) ? "dead" : "ok";
+  }
 
   /* ---------------- data ---------------- */
   async function readAll(table, order){
@@ -273,7 +293,7 @@ const Store = (() => {
     }catch(e){ return blank; }   /* ยังไม่ได้สร้างตาราง members = ไม่มีระบบสมาชิก */
   }
 
-  return {init, onAuth, signIn, signOut, displayName, myProfile, logActivity, readActivity,
+  return {init, onAuth, signIn, signOut, signOutHard, sessionState, displayName, myProfile, logActivity, readActivity,
           listMembers, createMember, updateMember, deleteMember, diagUsers,
           loadAll, save, patch, remove, subscribe, uploadFile, addLink, fileUrl, deleteFile,
           get client(){ return sb; }};
